@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QRFlux 二维码演示</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .panel {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    button {
+      background: #007acc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #005a9e;
+    }
+    select, input {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    #qr-canvas {
+      border: 1px solid #ddd;
+      margin-top: 20px;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+    .error {
+      color: #d32f2f;
+      background: #ffebee;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      color: #388e3c;
+      background: #e8f5e9;
+      padding: 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>QRFlux 二维码演示</h1>
+  
+  <div class="container">
+    <div class="panel">
+      <h2>单帧 QR 编码</h2>
+      <label>输入数据：</label>
+      <textarea id="input-data" placeholder="输入要编码的文本..."></textarea>
+      
+      <div style="margin-top: 10px;">
+        <label>版本：</label>
+        <select id="qr-version">
+          <option value="1">1 (21x21)</option>
+          <option value="2">2 (25x25)</option>
+          <option value="3">3 (29x29)</option>
+          <option value="5">5 (37x37)</option>
+          <option value="10">10 (57x57)</option>
+        </select>
+        
+        <label>纠错级别：</label>
+        <select id="qr-ecl">
+          <option value="L">L (7%)</option>
+          <option value="M">M (15%)</option>
+          <option value="Q">Q (25%)</option>
+          <option value="H">H (30%)</option>
+        </select>
+      </div>
+      
+      <button onclick="encodeQR()">生成 QR 码</button>
+      <button onclick="clearCanvas()">清除</button>
+      
+      <div id="qr-info"></div>
+      <canvas id="qr-canvas"></canvas>
+    </div>
+    
+    <div class="panel">
+      <h2>动态码流（多帧）</h2>
+      <label>输入数据（>100 字节会分片）：</label>
+      <textarea id="stream-data" placeholder="输入要分片编码的文本..."></textarea>
+      
+      <div style="margin-top: 10px;">
+        <label>每帧负载：</label>
+        <input type="number" id="frame-payload" value="50" min="10" max="200">
+      </div>
+      
+      <button onclick="encodeStream()">分片编码</button>
+      <div id="stream-info"></div>
+    </div>
+  </div>
+  
+  <div class="panel" style="margin-top: 20px;">
+    <h2>容量查询</h2>
+    <div>
+      <label>版本：</label>
+      <select id="cap-version">
+        <option value="1">1</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="40">40</option>
+      </select>
+      
+      <label>纠错级别：</label>
+      <select id="cap-ecl">
+        <option value="L">L</option>
+        <option value="M">M</option>
+        <option value="Q">Q</option>
+        <option value="H">H</option>
+      </select>
+      
+      <button onclick="getCapacity()">查询容量</button>
+    </div>
+    <div id="capacity-result"></div>
+  </div>
+  
+  <script src="qrflux.js"></script>
+  <script>
+    // 绘制 QR 码到 canvas
+    function drawQR(canvasId, matrix, size) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const cellSize = Math.max(2, Math.floor(400 / size));
+      
+      canvas.width = size * cellSize;
+      canvas.height = size * cellSize;
+      
+      // 绘制白色背景
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 绘制 QR 模块
+      ctx.fillStyle = 'black';
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          if (matrix[y][x] === '1') {
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+    }
+    
+    // 单帧 QR 编码
+    async function encodeQR() {
+      const data = document.getElementById('input-data').value;
+      const version = parseInt(document.getElementById('qr-version').value);
+      const ecl = document.getElementById('qr-ecl').value;
+      const infoDiv = document.getElementById('qr-info');
+      
+      if (!data) {
+        infoDiv.innerHTML = '<div class="error">请输入数据</div>';
+        return;
+      }
+      
+      try {
+        infoDiv.innerHTML = '<div class="success">编码中...</div>';
+        const result = wasm_bindgen.web_encode_qr(data, version, ecl);
+        const json = JSON.parse(result);
+        
+        infoDiv.innerHTML = `
+          <div class="success">
+            版本: ${json.version}, 大小: ${json.size}x${json.size}, mask: ${json.mask}
+          </div>
+        `;
+        
+        drawQR('qr-canvas', json.matrix, json.size);
+      } catch (e) {
+        infoDiv.innerHTML = `<div class="error">错误: ${e.message}</div>`;
+      }
+    }
+    
+    // 动态码流编码
+    async function encodeStream() {
+      const data = document.getElementById('stream-data').value;
+      const maxPayload = parseInt(document.getElementById('frame-payload').value);
+      const infoDiv = document.getElementById('stream-info');
+      
+      if (!data) {
+        infoDiv.innerHTML = '<div class="error">请输入数据</div>';
+        return;
+      }
+      
+      try {
+        const result = wasm_bindgen.web_encode_stream(data, maxPayload);
+        const json = JSON.parse(result);
+        
+        infoDiv.innerHTML = `
+          <div class="success">
+            总帧数: ${json.total_frames}<br>
+            每帧大小: ${json.frames[0]?.length || 0} 字节
+          </div>
+        `;
+      } catch (e) {
+        infoDiv.innerHTML = `<div class="error">错误: ${e.message}</div>`;
+      }
+    }
+    
+    // 查询容量
+    async function getCapacity() {
+      const version = parseInt(document.getElementById('cap-version').value);
+      const ecl = document.getElementById('cap-ecl').value;
+      const resultDiv = document.getElementById('capacity-result');
+      
+      try {
+        const result = wasm_bindgen.web_get_capacity(ecl, version);
+        const json = JSON.parse(result);
+        
+        resultDiv.innerHTML = `
+          <div class="success">
+            版本 ${json.version} (ECL: ${json.ecl}) 容量: ${json.capacity_bytes} 字节
+          </div>
+        `;
+      } catch (e) {
+        resultDiv.innerHTML = `<div class="error">错误: ${e.message}</div>`;
+      }
+    }
+    
+    // 清除画布
+    function clearCanvas() {
+      const canvas = document.getElementById('qr-canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.getElementById('qr-info').innerHTML = '';
+    }
+    
+    // 初始化 WASM
+    async function init() {
+      try {
+        await wasm_bindgen('qrflux_bg.wasm');
+        console.log('WASM loaded successfully');
+      } catch (e) {
+        console.error('Failed to load WASM:', e);
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
