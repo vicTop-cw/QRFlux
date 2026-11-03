@@ -46,7 +46,15 @@ node server.js
 # 访问 http://localhost:3000
 ```
 
-**注意**：完整的 WASM 集成需要额外的配置。当前网页演示展示了 UI 和功能设计，实际 QR 编码功能请通过命令行测试。
+## WASM 输出
+
+```sh
+# 生成 WASM
+moon build --target wasm
+# 输出文件: _build/wasm/debug/build/cmd/main/main.wasm (60KB)
+```
+
+**注意**：完整的 WASM 集成需要额外的 JavaScript 绑定配置。当前 WASM 文件已生成，但需要手动创建绑定代码才能在网页中使用。
 
 ## 目录结构
 

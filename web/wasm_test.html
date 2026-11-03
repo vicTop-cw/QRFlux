@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QRFlux WASM 测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      margin: 10px 0;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f0f0f0;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>QRFlux WASM 测试</h1>
+  <p>测试 QR 编码功能（WASM 版本）</p>
+  
+  <div>
+    <label>输入数据：</label>
+    <textarea id="input">Hello QRFlux WASM!</textarea>
+  </div>
+  
+  <div>
+    <label>版本：</label>
+    <select id="version">
+      <option value="1">1</option>
+      <option value="5">5</option>
+      <option value="10">10</option>
+    </select>
+    
+    <label>纠错级别：</label>
+    <select id="ecl">
+      <option value="L">L</option>
+      <option value="M">M</option>
+      <option value="Q">Q</option>
+      <option value="H">H</option>
+    </select>
+  </div>
+  
+  <button onclick="encodeQR()">生成 QR 码</button>
+  <button onclick="clearResult()">清除</button>
+  
+  <div id="result"></div>
+  
+  <script src="qrflux.js"></script>
+  <script>
+    let wasmModule = null;
+    
+    async function initWasm() {
+      try {
+        // 注意：需要正确的 WASM 绑定
+        // 这里只是一个示例，实际需要 MoonBit 生成的绑定
+        console.log('WASM 初始化需要额外的绑定配置');
+      } catch (e) {
+        console.error('WASM 初始化失败:', e);
+      }
+    }
+    
+    async function encodeQR() {
+      const input = document.getElementById('input').value;
+      const version = parseInt(document.getElementById('version').value);
+      const ecl = document.getElementById('ecl').value;
+      const resultDiv = document.getElementById('result');
+      
+      resultDiv.innerHTML = 'WASM 绑定需要额外配置。请使用命令行测试：<br><code>moon run cmd/main</code>';
+    }
+    
+    function clearResult() {
+      document.getElementById('result').innerHTML = '';
+    }
+    
+    // 初始化
+    initWasm();
+  </script>
+</body>
+</html>
