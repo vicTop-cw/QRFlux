@@ -47,8 +47,9 @@ pub struct CompressionResult {
 }
 
 ///|
-/// Run-Length Encoding (RLE) compression.
-pub fn rle_compress(data : FixedArray[Int]) -> FixedArray[Int] {
+/// Improved RLE compression with variable-length encoding.
+/// Uses single byte for short runs, multiple bytes for long runs.
+pub fn rle_compress_optimized(data : FixedArray[Int]) -> FixedArray[Int] {
   if data.length() == 0 {
     return FixedArray::make(0, 0)
   }
@@ -62,12 +63,23 @@ pub fn rle_compress(data : FixedArray[Int]) -> FixedArray[Int] {
     
     while i + count < data.length() && 
           data[i + count] == value && 
-          count < 255 {
+          count < 65535 {
       count = count + 1
     }
     
-    result.push(count)
-    result.push(value)
+    // Optimized encoding:
+    // - count < 255: 2 bytes [count, value]
+    // - count >= 255: 4 bytes [255, high_byte, low_byte, value]
+    
+    if count < 255 {
+      result.push(count)
+      result.push(value)
+    } else {
+      result.push(255)  // Marker for extended run
+      result.push((count >> 8) & 0xFF)
+      result.push(count & 0xFF)
+      result.push(value)
+    }
     
     i = i + count
   }
@@ -77,6 +89,59 @@ pub fn rle_compress(data : FixedArray[Int]) -> FixedArray[Int] {
     output[i] = result[i]
   }
   output
+}
+
+///|
+/// Optimized RLE decompression.
+pub fn rle_decompress_optimized(data : FixedArray[Int]) -> FixedArray[Int] {
+  if data.length() == 0 {
+    return FixedArray::make(0, 0)
+  }
+  
+  let result = Array::make(0, 0)
+  let mut i = 0
+  
+  while i < data.length() {
+    if data[i] == 255 {
+      // Extended run
+      if i + 3 >= data.length() {
+        break
+      }
+      let count = (data[i + 1] << 8) | data[i + 2]
+      let value = data[i + 3]
+      
+      for j = 0; j < count; j = j + 1 {
+        result.push(value)
+      }
+      
+      i = i + 4
+    } else {
+      // Normal run
+      if i + 1 >= data.length() {
+        break
+      }
+      let count = data[i]
+      let value = data[i + 1]
+      
+      for j = 0; j < count; j = j + 1 {
+        result.push(value)
+      }
+      
+      i = i + 2
+    }
+  }
+  
+  let output = FixedArray::make(result.length(), 0)
+  for i = 0; i < result.length(); i = i + 1 {
+    output[i] = result[i]
+  }
+  output
+}
+
+///|
+/// RLE compression.
+pub fn rle_compress(data : FixedArray[Int]) -> FixedArray[Int] {
+  rle_compress_optimized(data)
 }
 
 ///|
