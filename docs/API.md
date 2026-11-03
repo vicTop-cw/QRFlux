@@ -99,6 +99,32 @@ pub struct QrCode {
 - `crc32(data : FixedArray[Int]) -> Int`
   - 计算 CRC32 校验和
 
+## 统一 API 设计
+
+QRFlux 采用模块化设计，所有功能通过 `@qr` 包访问。
+
+### 模块组织
+
+```
+@qr/              # 主包
+├── qrcode.mbt    # QR 编码核心
+├── tables.mbt    # 常量表
+├── segment.mbt   # 分段编码
+├── gf256.mbt     # GF(256) 运算
+├── bits.mbt      # 位流操作
+├── stream.mbt    # 分片协议
+├── fountain.mbt  # 喷泉码
+├── package.mbt   # 打包协议
+├── strategy.mbt  # 压缩策略
+└── color_qr.mbt  # 彩色 QR
+```
+
+### 使用规范
+
+1. **导入**：`import @qr`
+2. **调用**：`@qr.function_name()`
+3. **枚举**：使用辅助函数创建（如 `@qr.ecc_low()`）
+
 ## 使用示例
 
 ### 基础编码
