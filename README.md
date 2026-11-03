@@ -31,10 +31,22 @@ h: ver=11 ecl=L mask=0 n=300 -> OK
 ## 验证方法
 
 ```sh
+moon test --target js       # 测试（JS 目标为权威）
 moon run cmd/main > batch.txt   # 生成 8 组参考矩阵
 pip install zxing-cpp
 python scripts/verify_qr.py batch.txt   # 8/8 OK
 ```
+
+## 网页演示
+
+```sh
+# 启动网页演示
+cd web
+node server.js
+# 访问 http://localhost:3000
+```
+
+**注意**：完整的 WASM 集成需要额外的配置。当前网页演示展示了 UI 和功能设计，实际 QR 编码功能请通过命令行测试。
 
 ## 目录结构
 
