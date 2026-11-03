@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QRFlux 摄像头扫码</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      display: grid;
+      gap: 20px;
+    }
+    .camera-panel {
+      background: #000;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    #camera-feed {
+      width: 100%;
+      border-radius: 4px;
+    }
+    #captured-image {
+      width: 100%;
+      border-radius: 4px;
+      display: none;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      background: #007acc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background: #005a9e;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .note {
+      margin-top: 20px;
+      padding: 15px;
+      background: #e3f2fd;
+      border-radius: 4px;
+      border-left: 4px solid #2196f3;
+    }
+  </style>
+</head>
+<body>
+  <h1>QRFlux 摄像头扫码</h1>
+  <p>使用摄像头扫描 QR 码</p>
+  
+  <div class="container">
+    <div class="camera-panel">
+      <video id="camera-feed" autoplay playsinline></video>
+      <canvas id="capture-canvas" style="display: none;"></canvas>
+      <img id="captured-image" alt="Captured image">
+    </div>
+    
+    <div>
+      <button onclick="startCamera()">启动摄像头</button>
+      <button onclick="captureImage()">捕获图像</button>
+      <button onclick="stopCamera()">停止摄像头</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <div class="note">
+      <strong>💡 说明：</strong>
+      <p style="margin: 10px 0 0 0;">
+        完整的 QR 解码需要额外的解码库（如 zxing-wasm 或 jsQR）。
+        当前实现提供摄像头捕获功能，QR 解码需要集成外部库。
+      </p>
+    </div>
+  </div>
+  
+  <script>
+    let videoStream = null;
+    
+    async function startCamera() {
+      const resultDiv = document.getElementById('result');
+      const video = document.getElementById('camera-feed');
+      
+      try {
+        const constraints = {
+          video: {
+            facingMode: 'environment',  // 后置摄像头
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
+        
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = videoStream;
+        
+        resultDiv.innerHTML = '<div class="success">摄像头已启动</div>';
+      } catch (e) {
+        resultDiv.innerHTML = '<div class="error">摄像头启动失败: ' + e.message + '</div>';
+      }
+    }
+    
+    function captureImage() {
+      const video = document.getElementById('camera-feed');
+      const canvas = document.getElementById('capture-canvas');
+      const img = document.getElementById('captured-image');
+      const resultDiv = document.getElementById('result');
+      
+      if (!videoStream) {
+        resultDiv.innerHTML = '<div class="error">请先启动摄像头</div>';
+        return;
+      }
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      // Convert to image
+      img.src = canvas.toDataURL('image/png');
+      img.style.display = 'block';
+      
+      resultDiv.innerHTML = '<div class="success">图像已捕获</div>';
+    }
+    
+    function stopCamera() {
+      const video = document.getElementById('camera-feed');
+      
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+        video.srcObject = null;
+      }
+      
+      document.getElementById('result').innerHTML = '<div class="success">摄像头已停止</div>';
+    }
+    
+    // Note: Full QR decoding requires external library
+    // Options: zxing-wasm, jsQR, or similar
+  </script>
+</body>
+</html>
