@@ -1,0 +1,93 @@
+Error: [4021]
+   ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:4:11 ]
+   │
+ 4 │   let m = gf_mul(0x53, 0xCA)
+   │           ───┬──  
+   │              ╰──── The value identifier gf_mul is unbound.
+───╯
+Warning: [0002]
+   ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:7:7 ]
+   │
+ 7 │   let n = num_data_codewords(1, EccLevel::Low)
+   │       ┬  
+   │       ╰── Warning (unused_value): Unused variable 'n'
+───╯
+Error: [4021]
+   ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:7:11 ]
+   │
+ 7 │   let n = num_data_codewords(1, EccLevel::Low)
+   │           ─────────┬────────  
+   │                    ╰────────── The value identifier num_data_codewords is unbound.
+───╯
+Error: [4024]
+   ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:7:33 ]
+   │
+ 7 │   let n = num_data_codewords(1, EccLevel::Low)
+   │                                 ────┬───  
+   │                                     ╰───── The type/trait EccLevel is not found.
+───╯
+Error: [4064]
+   ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:8:27 ]
+   │
+ 8 │   println("v1 L data cw = \(n)")
+   │                           ─┬  
+   │                            ╰── Invalid escape sequence: \(. Hint: Use `\{x}` for string interpolation.
+───╯
+Warning: [0002]
+    ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:14:7 ]
+    │
+ 14 │   let qr = encode_binary(data, EccLevel::Low, 1)
+    │       ─┬  
+    │        ╰── Warning (unused_value): Unused variable 'qr'
+────╯
+Error: [4021]
+    ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:14:12 ]
+    │
+ 14 │   let qr = encode_binary(data, EccLevel::Low, 1)
+    │            ──────┬──────  
+    │                  ╰──────── The value identifier encode_binary is unbound.
+────╯
+Error: [4024]
+    ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:14:32 ]
+    │
+ 14 │   let qr = encode_binary(data, EccLevel::Low, 1)
+    │                                ────┬───  
+    │                                    ╰───── The type/trait EccLevel is not found.
+────╯
+Error: [4064]
+    ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\main.mbt:15:22 ]
+    │
+ 15 │   println("version = \(qr.version())")
+    │                      ─┬  
+    │                       ╰── Invalid escape sequence: \(. Hint: Use `\{x}` for string interpolation.
+────╯
+Warning: [0029]
+   ╭─[ E:\IDEProjects\AI\QRFlux\cmd\main\moon.pkg:2:3 ]
+   │
+ 2 │   "vicTop-cw/QRFlux/src/qr",
+   │   ────────────┬────────────  
+   │               ╰────────────── Warning (unused_package): Unused package 'vicTop-cw/QRFlux/src/qr'
+───╯
+Warning: [0002]
+     ╭─[ E:\IDEProjects\AI\QRFlux\src\qr\qrcode.mbt:375:3 ]
+     │
+ 375 │   version : Int,
+     │   ───┬───  
+     │      ╰───── Warning (unused_value): Unused variable 'version'
+─────╯
+Warning: [0006]
+   ╭─[ E:\IDEProjects\AI\QRFlux\src\qr\segment.mbt:5:3 ]
+   │
+ 5 │   Numeric
+   │   ───┬───  
+   │      ╰───── Warning (unused_constructor): Variant 'Numeric' is never constructed
+───╯
+Warning: [0006]
+   ╭─[ E:\IDEProjects\AI\QRFlux\src\qr\segment.mbt:6:3 ]
+   │
+ 6 │   Alphanumeric
+   │   ──────┬─────  
+   │         ╰─────── Warning (unused_constructor): Variant 'Alphanumeric' is never constructed
+───╯
+Failed with 6 warnings, 7 errors.
+Error: failed when building project

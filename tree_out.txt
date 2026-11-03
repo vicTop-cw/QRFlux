@@ -1,0 +1,2 @@
+vicTop-cw/QRFlux@0.1.0 (local E:\IDEProjects\AI\QRFlux):
+  (no dependencies)

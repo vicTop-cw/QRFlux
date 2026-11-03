@@ -1,0 +1,21 @@
+Warning: [0002]
+     ╭─[ E:\IDEProjects\AI\QRFlux\src\qr\qrcode.mbt:407:3 ]
+     │
+ 407 │   version : Int,
+     │   ───┬───  
+     │      ╰───── Warning (unused_value): Unused variable 'version'
+─────╯
+Warning: [0006]
+   ╭─[ E:\IDEProjects\AI\QRFlux\src\qr\segment.mbt:5:3 ]
+   │
+ 5 │   Numeric
+   │   ───┬───  
+   │      ╰───── Warning (unused_constructor): Variant 'Numeric' is never constructed
+───╯
+Warning: [0006]
+   ╭─[ E:\IDEProjects\AI\QRFlux\src\qr\segment.mbt:6:3 ]
+   │
+ 6 │   Alphanumeric
+   │   ──────┬─────  
+   │         ╰─────── Warning (unused_constructor): Variant 'Alphanumeric' is never constructed
+───╯
