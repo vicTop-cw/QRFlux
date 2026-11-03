@@ -68,3 +68,4 @@ scripts/        交叉验证脚本
 
 - 单张静态 QR 容量上限：V40 L=2953 / M=2331 / Q=1663 / H=1273 字节；>1KB 走动态码流。
 - moon 0.1.20261016 依赖解析（moon add/import）存在 registry 兼容问题，故保持零三方依赖、纯自研路线。
+- 彩色 QR 码方案设计见 `docs/COLOR_QR_DESIGN.md`（非标准，需专用解码器）。
