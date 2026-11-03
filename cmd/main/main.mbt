@@ -10,6 +10,7 @@ fn main {
     ("f", 100, "M"),
     ("g", 200, "L"),
     ("h", 300, "L"),
+    ("i", 2900, "L"),  // V40 Low
   ]
   for c in cases {
     let (label, len, ecl) = c
