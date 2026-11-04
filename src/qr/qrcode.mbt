@@ -222,42 +222,51 @@ fn add_ecc_and_interleave(
   let rawcodewords = num_raw_data_modules(version) / 8
   let numshortblocks = numblocks - rawcodewords % numblocks
   let shortblocklen = rawcodewords / numblocks
+  // Short block data length (long blocks have one extra data codeword).
+  let shortdatalen = shortblocklen - blockecclen
 
   let rsdiv = rs_compute_divisor(blockecclen)
 
-  // Split into blocks, compute ECC for each.
-  let blocks : Array[FixedArray[Int32]] = []
+  // Split data into blocks and compute ECC for each block separately.
+  let datblocks : Array[FixedArray[Int32]] = []
+  let eccblocks : Array[FixedArray[Int32]] = []
   let mut k = 0
   for i = 0; i < numblocks; i = i + 1 {
-    let dlen = shortblocklen -
-      blockecclen +
-      (if i < numshortblocks { 0 } else { 1 })
+    let dlen = shortdatalen + (if i < numshortblocks { 0 } else { 1 })
     let dat = FixedArray::make(dlen, 0)
     for j = 0; j < dlen; j = j + 1 {
       dat[j] = data[k + j]
     }
     k = k + dlen
     let ecc = rs_compute_remainder(dat, rsdiv)
-    let padded = FixedArray::make(dlen + blockecclen, 0)
-    for j = 0; j < dlen; j = j + 1 {
-      padded[j] = dat[j]
-    }
-    for j = 0; j < blockecclen; j = j + 1 {
-      padded[dlen + j] = ecc[j]
-    }
-    blocks.push(padded)
+    datblocks.push(dat)
+    eccblocks.push(ecc)
   }
 
-  // Interleave.
+  // Interleave per ISO/IEC 18004 8.5.3: data codewords first (column-major,
+  // skipping short blocks at the extra column), then ECC codewords (column-major
+  // across all blocks). The previous implementation concatenated data+ecc per
+  // block and interleaved the concatenation, which dropped the long blocks'
+  // extra data codeword and mis-ordered ECC when numshortblocks < numblocks.
   let result = FixedArray::make(rawcodewords, 0)
   let mut idx = 0
-  let blklen = blocks[0].length()
-  for i = 0; i < blklen; i = i + 1 {
+  // Data: columns 0..shortdatalen-1, all blocks.
+  for i = 0; i < shortdatalen; i = i + 1 {
     for j = 0; j < numblocks; j = j + 1 {
-      if !(i == shortblocklen - blockecclen && j >= numshortblocks) {
-        result[idx] = blocks[j][i]
-        idx = idx + 1
-      }
+      result[idx] = datblocks[j][i]
+      idx = idx + 1
+    }
+  }
+  // Data: column shortdatalen, only long blocks (short blocks have no extra).
+  for j = numshortblocks; j < numblocks; j = j + 1 {
+    result[idx] = datblocks[j][shortdatalen]
+    idx = idx + 1
+  }
+  // ECC: all columns, all blocks (every block has blockecclen ECC codewords).
+  for i = 0; i < blockecclen; i = i + 1 {
+    for j = 0; j < numblocks; j = j + 1 {
+      result[idx] = eccblocks[j][i]
+      idx = idx + 1
     }
   }
   result
