@@ -139,7 +139,7 @@ pub fn decode_static(qr_bytes : FixedArray[Int32]) -> FixedArray[Int32]? {
       // Decompress by algorithm ID.
       match algo_id {
         0 => Some(payload)
-        1 => Some(rle_decompress(payload))
+        1 => Some(rle_decompress_optimized(payload))
         _ => None // unknown/unimplemented algorithm (e.g. algo=2 deflate)
       }
   }

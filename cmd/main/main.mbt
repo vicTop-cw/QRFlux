@@ -454,13 +454,14 @@ fn run_batch() -> Unit {
       emit_case(label, n, ecl_names[ei], vi + 1)
     }
   }
-  // Representative version sweep: V12~V39 × L/M/Q/H.
-  // 8 representative versions (12,15,18,20,25,30,35,39) to cover the
-  // previously blank V12~V39 range without exhausting all 28 versions.
+  // Full version sweep: V12~V39 × L/M/Q/H (all 28 versions).
   // Capacity is computed dynamically via the encoder's own functions to
   // guarantee consistency (avoids hard-coded table drift).
-  // Data length = capacity - 5 (leave a small margin).
-  let rep_versions : Array[Int32] = [12, 15, 18, 20, 25, 30, 35, 39]
+  // Data length = capacity - 5 (leave a small margin, ~95%+ utilization).
+  let rep_versions : Array[Int32] = [
+    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+    32, 33, 34, 35, 36, 37, 38, 39,
+  ]
   for ver in rep_versions {
     for ei = 0; ei < 4; ei = ei + 1 {
       let level = ecl_from_name(ecl_names[ei])
