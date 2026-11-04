@@ -19,7 +19,7 @@ repository = "https://github.com/vicTop-cw/QRFlux"
 
 license = "Apache-2.0"
 
-keywords = ["qr", "barcode", "file-transfer", "fountain-code", "lossless"]
+keywords = [ "qr", "barcode", "file-transfer", "fountain-code", "lossless" ]
 
 preferred_target = "native"
 

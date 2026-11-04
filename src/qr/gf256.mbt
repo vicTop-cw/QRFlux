@@ -2,8 +2,9 @@
 /// Reed-Solomon error correction for QR uses this field.
 /// Implemented from the ISO/IEC 18004 algorithm description.
 
+///|
 /// Multiply two field elements modulo GF(2^8/0x11D) using Russian peasant multiplication.
-pub fn gf_mul(x : Int, y : Int) -> Int {
+pub fn gf_mul(x : Int32, y : Int32) -> Int32 {
   let mut z = 0
   let yy = y
   for i = 7; i >= 0; i = i - 1 {
@@ -15,8 +16,9 @@ pub fn gf_mul(x : Int, y : Int) -> Int {
   z & 0xFF
 }
 
+///|
 /// Raise a field element to the given non-negative power.
-pub fn gf_pow(x : Int, power : Int) -> Int {
+pub fn gf_pow(x : Int32, power : Int32) -> Int32 {
   let mut result = 1
   let mut base = x
   let mut p = power
@@ -30,16 +32,17 @@ pub fn gf_pow(x : Int, power : Int) -> Int {
   result
 }
 
+///|
 /// Compute the Reed-Solomon generator polynomial for the given degree.
 /// Returns coefficients from highest power down, excluding the leading 1.
-pub fn rs_compute_divisor(degree : Int) -> FixedArray[Int] {
+pub fn rs_compute_divisor(degree : Int32) -> FixedArray[Int32] {
   let result = FixedArray::make(degree, 0)
   result[degree - 1] = 1
   let mut root = 1
   for _i = 0; _i < degree; _i = _i + 1 {
     for j = 0; j < degree; j = j + 1 {
       result[j] = gf_mul(result[j], root)
-      if (j + 1) < degree {
+      if j + 1 < degree {
         result[j] = result[j] ^ result[j + 1]
       }
     }
@@ -48,9 +51,13 @@ pub fn rs_compute_divisor(degree : Int) -> FixedArray[Int] {
   result
 }
 
+///|
 /// Compute the Reed-Solomon remainder (error correction codewords) of data
 /// divided by the generator polynomial.
-pub fn rs_compute_remainder(data : FixedArray[Int], divisor : FixedArray[Int]) -> FixedArray[Int] {
+pub fn rs_compute_remainder(
+  data : FixedArray[Int32],
+  divisor : FixedArray[Int32],
+) -> FixedArray[Int32] {
   let dlen = data.length()
   let divlen = divisor.length()
   let result = FixedArray::make(divlen, 0)

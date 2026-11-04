@@ -1,3 +1,4 @@
+///|
 test "encode small binary" {
   let data = FixedArray::make(10, 0)
   for i = 0; i < 10; i = i + 1 {
@@ -14,11 +15,13 @@ test "encode small binary" {
   assert_true(qr.get_module(8, qr.size() - 8))
 }
 
+///|
 test "capacity v40 L" {
   assert_true(@qr.num_data_codewords(40, @qr.ecc_low()) == 2956)
   assert_true(@qr.num_data_codewords(40, @qr.ecc_high()) == 1276)
 }
 
+///|
 test "encode max binary v40 L" {
   // V40 Low max data bytes = 2953, leave room for overhead
   let n = 2900
@@ -28,6 +31,7 @@ test "encode max binary v40 L" {
   assert_true(qr.level() == @qr.ecc_low())
 }
 
+///|
 test "align positions v2" {
   let p = @qr.alignment_pattern_positions(2)
   assert_true(p.length() == 2)

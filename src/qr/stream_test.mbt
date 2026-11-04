@@ -1,3 +1,4 @@
+///|
 test "frame header serialize/parse" {
   let header = @qr.FrameHeader::make(10, 3, 100, 0x1234)
   let bytes = header.to_bytes()
@@ -13,13 +14,15 @@ test "frame header serialize/parse" {
   }
 }
 
+///|
 test "frame header invalid magic" {
   let bytes = FixedArray::make(16, 0)
-  bytes[0] = 0x58  // Wrong magic (0x58 = 'X')
+  bytes[0] = 0x58 // Wrong magic (0x58 = 'X')
   let parsed = @qr.FrameHeader::from_bytes(bytes)
   assert_true(parsed is None)
 }
 
+///|
 test "crc16 basic" {
   let data = FixedArray::make(4, 0)
   data[0] = 0x01
@@ -30,11 +33,12 @@ test "crc16 basic" {
   assert_true(crc >= 0 && crc <= 0xFFFF)
 }
 
+///|
 test "split and reassemble" {
   let data = FixedArray::make(100, 0x42)
   let frames = @qr.split_into_frames(data, 32)
   assert_true(frames.length() > 0)
-  
+
   match @qr.reassemble_frames(frames) {
     Some(result) => {
       assert_true(result.length() == 100)
@@ -47,11 +51,12 @@ test "split and reassemble" {
   }
 }
 
+///|
 test "split and reassemble large" {
   let data = FixedArray::make(500, 0x99)
   let frames = @qr.split_into_frames(data, 32)
   assert_true(frames.length() > 0)
-  
+
   match @qr.reassemble_frames(frames) {
     Some(result) => {
       assert_true(result.length() == 500)
@@ -64,10 +69,11 @@ test "split and reassemble large" {
   }
 }
 
+///|
 test "reassemble missing frame" {
   let data = FixedArray::make(100, 0x42)
   let frames = @qr.split_into_frames(data, 32)
-  
+
   // Remove a frame
   let frames_copy = Array::new()
   for i = 0; i < frames.length(); i = i + 1 {
@@ -75,31 +81,33 @@ test "reassemble missing frame" {
       frames_copy.push(frames[i])
     }
   }
-  
+
   let reassembled = @qr.reassemble_frames(frames_copy)
   assert_true(reassembled is None)
 }
 
+///|
 test "reassemble wrong order" {
   let data = FixedArray::make(100, 0x42)
   let frames = @qr.split_into_frames(data, 32)
-  
+
   // Swap frames
   let temp = frames[0]
   frames[0] = frames[1]
   frames[1] = temp
-  
+
   let reassembled = @qr.reassemble_frames(frames)
   assert_true(reassembled is None)
 }
 
+///|
 test "reassemble corrupted checksum" {
   let data = FixedArray::make(100, 0x42)
   let frames = @qr.split_into_frames(data, 32)
-  
+
   // Corrupt a payload byte
   frames[0][20] = 0x00
-  
+
   let reassembled = @qr.reassemble_frames(frames)
   assert_true(reassembled is None)
 }

@@ -19,47 +19,51 @@
 /// | Reserved (18B)     | 0x00
 /// +--------------------+
 pub struct PackageHeader {
-  magic : FixedArray[Int];
-  version : Int;
-  flags : Int;
-  data_length : Int;
-  original_size : Int;
-  checksum : Int;
+  magic : FixedArray[Int32]
+  version : Int32
+  flags : Int32
+  data_length : Int32
+  original_size : Int32
+  checksum : Int32
 }
 
 ///|
 /// Magic bytes: "QRFX" = 0x51 0x52 0x46 0x58
-pub const MAGIC_Q1 : Int = 0x51
-pub const MAGIC_R2 : Int = 0x52
-pub const MAGIC_F3 : Int = 0x46
-pub const MAGIC_X4 : Int = 0x58
+pub const MAGIC_Q1 : Int32 = 0x51
+
+///|
+pub const MAGIC_R2 : Int32 = 0x52
+
+///|
+pub const MAGIC_F3 : Int32 = 0x46
+
+///|
+pub const MAGIC_X4 : Int32 = 0x58
 
 ///|
 /// Flag bits
-pub const FLAG_COMPRESSED : Int = 0x01
+pub const FLAG_COMPRESSED : Int32 = 0x01
 
 ///|
 /// Create a new package header.
-pub fn PackageHeader::make(data_length : Int, original_size : Int, checksum : Int, compressed : Bool) -> PackageHeader {
+pub fn PackageHeader::make(
+  data_length : Int32,
+  original_size : Int32,
+  checksum : Int32,
+  compressed : Bool,
+) -> PackageHeader {
   let flags = if compressed { FLAG_COMPRESSED } else { 0 }
   let magic = FixedArray::make(4, 0)
   magic[0] = MAGIC_Q1
   magic[1] = MAGIC_R2
   magic[2] = MAGIC_F3
   magic[3] = MAGIC_X4
-  {
-    magic,
-    version: 1,
-    flags,
-    data_length,
-    original_size,
-    checksum,
-  }
+  { magic, version: 1, flags, data_length, original_size, checksum, }
 }
 
 ///|
 /// Serialize package header to bytes (32 bytes).
-pub fn PackageHeader::to_bytes(self : PackageHeader) -> FixedArray[Int] {
+pub fn PackageHeader::to_bytes(self : PackageHeader) -> FixedArray[Int32] {
   let bytes = FixedArray::make(32, 0)
   // Magic (4 bytes)
   bytes[0] = self.magic[0]
@@ -91,12 +95,15 @@ pub fn PackageHeader::to_bytes(self : PackageHeader) -> FixedArray[Int] {
 
 ///|
 /// Parse package header from bytes (32 bytes).
-pub fn PackageHeader::from_bytes(bytes : FixedArray[Int]) -> PackageHeader? {
+pub fn PackageHeader::from_bytes(bytes : FixedArray[Int32]) -> PackageHeader? {
   if bytes.length() < 32 {
     return None
   }
   // Verify magic
-  if bytes[0] != MAGIC_Q1 || bytes[1] != MAGIC_R2 || bytes[2] != MAGIC_F3 || bytes[3] != MAGIC_X4 {
+  if bytes[0] != MAGIC_Q1 ||
+    bytes[1] != MAGIC_R2 ||
+    bytes[2] != MAGIC_F3 ||
+    bytes[3] != MAGIC_X4 {
     return None
   }
   // Verify version
@@ -110,17 +117,19 @@ pub fn PackageHeader::from_bytes(bytes : FixedArray[Int]) -> PackageHeader? {
   magic[3] = bytes[3]
   let version = bytes[4]
   let flags = bytes[5]
-  let data_length = (bytes[6] << 24) | (bytes[7] << 16) | (bytes[8] << 8) | bytes[9]
-  let original_size = (bytes[10] << 24) | (bytes[11] << 16) | (bytes[12] << 8) | bytes[13]
-  let checksum = (bytes[14] << 24) | (bytes[15] << 16) | (bytes[16] << 8) | bytes[17]
-  Some({
-    magic,
-    version,
-    flags,
-    data_length,
-    original_size,
-    checksum,
-  })
+  let data_length = (bytes[6] << 24) |
+    (bytes[7] << 16) |
+    (bytes[8] << 8) |
+    bytes[9]
+  let original_size = (bytes[10] << 24) |
+    (bytes[11] << 16) |
+    (bytes[12] << 8) |
+    bytes[13]
+  let checksum = (bytes[14] << 24) |
+    (bytes[15] << 16) |
+    (bytes[16] << 8) |
+    bytes[17]
+  Some({ magic, version, flags, data_length, original_size, checksum, })
 }
 
 ///|
@@ -131,7 +140,7 @@ pub fn PackageHeader::is_compressed(self : PackageHeader) -> Bool {
 
 ///|
 /// Simple CRC32 checksum.
-pub fn crc32(data : FixedArray[Int]) -> Int {
+pub fn crc32(data : FixedArray[Int32]) -> Int32 {
   let mut crc = 0xFFFFFFFF
   for i = 0; i < data.length(); i = i + 1 {
     crc = crc ^ data[i]
@@ -149,11 +158,19 @@ pub fn crc32(data : FixedArray[Int]) -> Int {
 ///|
 /// Package data with header.
 /// Returns: header (32 bytes) + payload
-pub fn package_with_header(data : FixedArray[Int], compressed : Bool) -> FixedArray[Int] {
+pub fn package_with_header(
+  data : FixedArray[Int32],
+  compressed : Bool,
+) -> FixedArray[Int32] {
   let checksum = crc32(data)
-  let header = PackageHeader::make(data.length(), data.length(), checksum, compressed)
+  let header = PackageHeader::make(
+    data.length(),
+    data.length(),
+    checksum,
+    compressed,
+  )
   let header_bytes = header.to_bytes()
-  
+
   let pkg = FixedArray::make(32 + data.length(), 0)
   for i = 0; i < 32; i = i + 1 {
     pkg[i] = header_bytes[i]
@@ -161,23 +178,25 @@ pub fn package_with_header(data : FixedArray[Int], compressed : Bool) -> FixedAr
   for i = 0; i < data.length(); i = i + 1 {
     pkg[32 + i] = data[i]
   }
-  
+
   pkg
 }
 
 ///|
 /// Unpackage data from header + payload.
 /// Returns: (payload, original_size, compressed)
-pub fn unpackage_from_header(pkg : FixedArray[Int]) -> (FixedArray[Int], Int, Bool)? {
+pub fn unpackage_from_header(
+  pkg : FixedArray[Int32],
+) -> (FixedArray[Int32], Int32, Bool)? {
   if pkg.length() < 32 {
     return None
   }
-  
+
   let header_bytes = FixedArray::make(32, 0)
   for i = 0; i < 32; i = i + 1 {
     header_bytes[i] = pkg[i]
   }
-  
+
   let header = PackageHeader::from_bytes(header_bytes)
   match header {
     Some(h) => {
@@ -185,19 +204,19 @@ pub fn unpackage_from_header(pkg : FixedArray[Int]) -> (FixedArray[Int], Int, Bo
       if pkg.length() < 32 + h.data_length {
         return None
       }
-      
+
       // Extract payload
       let payload = FixedArray::make(h.data_length, 0)
       for i = 0; i < h.data_length; i = i + 1 {
         payload[i] = pkg[32 + i]
       }
-      
+
       // Verify checksum
       let actual_checksum = crc32(payload)
       if actual_checksum != h.checksum {
         return None
       }
-      
+
       Some((payload, h.original_size, h.is_compressed()))
     }
     None => None

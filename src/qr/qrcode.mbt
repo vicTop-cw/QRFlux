@@ -1,8 +1,9 @@
 /// QR Code Model 2 encoder core.
 /// Self-implemented from ISO/IEC 18004 algorithm description.
 
+///|
 /// Number of raw data modules (including remainder bits) for a version.
-pub fn num_raw_data_modules(ver : Int) -> Int {
+pub fn num_raw_data_modules(ver : Int32) -> Int32 {
   let mut result = (16 * ver + 128) * ver + 64
   if ver >= 2 {
     let numalign = ver / 7 + 2
@@ -14,18 +15,20 @@ pub fn num_raw_data_modules(ver : Int) -> Int {
   result
 }
 
+///|
 /// Number of data codewords (8-bit, excluding ECC) for version+level.
-pub fn num_data_codewords(ver : Int, level : EccLevel) -> Int {
+pub fn num_data_codewords(ver : Int32, level : EccLevel) -> Int32 {
   num_raw_data_modules(ver) / 8 -
-    ecc_codewords_per_block(level, ver) * num_ecc_blocks(level, ver)
+  ecc_codewords_per_block(level, ver) * num_ecc_blocks(level, ver)
 }
 
+///|
 /// Total bits needed for given segments at a version.
-pub fn total_bits(segs : Array[Segment], version : Int) -> Int {
+pub fn total_bits(segs : Array[Segment], version : Int32) -> Int32 {
   let mut result = 0
   for seg in segs {
     let ccbits = char_count_bits(seg.mode(), version)
-    if seg.num_chars() >= (1 << ccbits) {
+    if seg.num_chars() >= 1 << ccbits {
       return -1 // does not fit
     }
     result = result + 4 + ccbits + seg.data().length()
@@ -33,61 +36,74 @@ pub fn total_bits(segs : Array[Segment], version : Int) -> Int {
   result
 }
 
+///|
 pub struct QrCode {
-  version : Int
-  size : Int
+  version : Int32
+  size : Int32
   level : EccLevel
-  mask : Int
+  mask : Int32
   modules : FixedArray[FixedArray[Bool]]
 }
 
-pub fn QrCode::version(self : QrCode) -> Int {
+///|
+pub fn QrCode::version(self : QrCode) -> Int32 {
   self.version
 }
 
-pub fn QrCode::size(self : QrCode) -> Int {
+///|
+pub fn QrCode::size(self : QrCode) -> Int32 {
   self.size
 }
 
+///|
 pub fn QrCode::level(self : QrCode) -> EccLevel {
   self.level
 }
 
-pub fn QrCode::mask(self : QrCode) -> Int {
+///|
+pub fn QrCode::mask(self : QrCode) -> Int32 {
   self.mask
 }
 
-pub fn QrCode::get_module(self : QrCode, x : Int, y : Int) -> Bool {
+///|
+pub fn QrCode::get_module(self : QrCode, x : Int32, y : Int32) -> Bool {
   if x < 0 || x >= self.size || y < 0 || y >= self.size {
     return false
   }
   self.modules[y][x]
 }
 
+///|
 /// Encode binary data (byte mode) into a QR Code with smallest version in
 /// [minversion, 40] and given ECC level; boosts ECC when possible without
 /// changing version; auto-picks best mask.
-pub fn encode_binary(data : FixedArray[Int], level : EccLevel, minversion : Int) -> QrCode {
+pub fn encode_binary(
+  data : FixedArray[Int32],
+  level : EccLevel,
+  minversion : Int32,
+) -> QrCode {
   let segs = [Segment::make_bytes(data)]
   encode_segments(segs, level, minversion)
 }
 
+///|
 pub fn encode_segments(
   segs : Array[Segment],
   ecl : EccLevel,
-  minversion : Int
+  minversion : Int32,
 ) -> QrCode {
   let (version, level) = choose_version_level(segs, ecl, minversion)
   let datacodewords = make_data_codewords(segs, version, level)
   build_qr(version, level, datacodewords)
 }
 
+///|
 /// Pick smallest fitting version, then boost ECC level if capacity allows.
 fn choose_version_level(
   segs : Array[Segment],
   ecl : EccLevel,
-  minversion : Int
-) -> (Int, EccLevel) {
+  minversion : Int32,
+) -> (Int32, EccLevel) {
   let mut version = minversion
   let mut found = false
   let mut datausedbits = 0
@@ -112,12 +128,13 @@ fn choose_version_level(
   (version, level)
 }
 
+///|
 /// Concatenate segments, append terminator/padding, return data codewords.
 fn make_data_codewords(
   segs : Array[Segment],
-  version : Int,
-  level : EccLevel
-) -> FixedArray[Int] {
+  version : Int32,
+  level : EccLevel,
+) -> FixedArray[Int32] {
   let bb = BitBuffer::new()
   for seg in segs {
     bb.append_bits(mode_bits(seg.mode()), 4)
@@ -131,7 +148,7 @@ fn make_data_codewords(
   if term > 0 {
     bb.append_bits(0, term)
   }
-  bb.append_bits(0, (8 - (bb.length() % 8)) % 8)
+  bb.append_bits(0, (8 - bb.length() % 8) % 8)
   let mut padbyte = 0xEC
   while bb.length() < capacity {
     bb.append_bits(padbyte, 8)
@@ -140,12 +157,13 @@ fn make_data_codewords(
   bb.to_bytes()
 }
 
+///|
 /// Debug helper: expose raw data codewords and interleaved ECC codewords.
 pub fn debug_codewords(
-  data : FixedArray[Int],
+  data : FixedArray[Int32],
   ecl : EccLevel,
-  minversion : Int
-) -> (FixedArray[Int], FixedArray[Int]) {
+  minversion : Int32,
+) -> (FixedArray[Int32], FixedArray[Int32]) {
   let segs = [Segment::make_bytes(data)]
   let (version, level) = choose_version_level(segs, ecl, minversion)
   let datacodewords = make_data_codewords(segs, version, level)
@@ -153,8 +171,13 @@ pub fn debug_codewords(
   (datacodewords, all)
 }
 
+///|
 /// Add ECC, interleave blocks, draw modules, choose best mask.
-fn build_qr(version : Int, level : EccLevel, datacodewords : FixedArray[Int]) -> QrCode {
+fn build_qr(
+  version : Int32,
+  level : EccLevel,
+  datacodewords : FixedArray[Int32],
+) -> QrCode {
   let size = version * 4 + 17
   let modules = FixedArray::make(size, FixedArray::make(size, false))
   let isfunction = FixedArray::make(size, FixedArray::make(size, false))
@@ -184,21 +207,16 @@ fn build_qr(version : Int, level : EccLevel, datacodewords : FixedArray[Int]) ->
   apply_mask(size, bestmask, modules, isfunction)
   draw_format_bits(size, level, bestmask, modules, isfunction)
 
-  {
-    version,
-    size,
-    level,
-    mask: bestmask,
-    modules,
-  }
+  { version, size, level, mask: bestmask, modules, }
 }
 
+///|
 /// Split data into blocks, append RS ECC per block, interleave.
 fn add_ecc_and_interleave(
-  version : Int,
+  version : Int32,
   level : EccLevel,
-  data : FixedArray[Int]
-) -> FixedArray[Int] {
+  data : FixedArray[Int32],
+) -> FixedArray[Int32] {
   let numblocks = num_ecc_blocks(level, version)
   let blockecclen = ecc_codewords_per_block(level, version)
   let rawcodewords = num_raw_data_modules(version) / 8
@@ -208,10 +226,12 @@ fn add_ecc_and_interleave(
   let rsdiv = rs_compute_divisor(blockecclen)
 
   // Split into blocks, compute ECC for each.
-  let blocks : Array[FixedArray[Int]] = []
+  let blocks : Array[FixedArray[Int32]] = []
   let mut k = 0
   for i = 0; i < numblocks; i = i + 1 {
-    let dlen = shortblocklen - blockecclen + (if i < numshortblocks { 0 } else { 1 })
+    let dlen = shortblocklen -
+      blockecclen +
+      (if i < numshortblocks { 0 } else { 1 })
     let dat = FixedArray::make(dlen, 0)
     for j = 0; j < dlen; j = j + 1 {
       dat[j] = data[k + j]
@@ -243,12 +263,13 @@ fn add_ecc_and_interleave(
   result
 }
 
+///|
 /// Draw timing, finder, alignment, format, version function modules.
 fn draw_function_patterns(
-  version : Int,
-  size : Int,
+  version : Int32,
+  size : Int32,
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   // Timing patterns.
   for i = 0; i < size; i = i + 1 {
@@ -265,7 +286,8 @@ fn draw_function_patterns(
   for i = 0; i < numalign; i = i + 1 {
     for j = 0; j < numalign; j = j + 1 {
       // Skip the three corners covered by finders.
-      let skip = (i == 0 && j == 0) || (i == 0 && j == numalign - 1) ||
+      let skip = (i == 0 && j == 0) ||
+        (i == 0 && j == numalign - 1) ||
         (i == numalign - 1 && j == 0)
       if !skip {
         draw_alignment(alignpos[i], alignpos[j], modules, isfunction)
@@ -278,23 +300,25 @@ fn draw_function_patterns(
   draw_version_info(version, size, modules, isfunction)
 }
 
+///|
 fn set_function(
-  x : Int,
-  y : Int,
+  x : Int32,
+  y : Int32,
   isdark : Bool,
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   modules[y][x] = isdark
   isfunction[y][x] = true
 }
 
+///|
 fn draw_finder(
-  cx : Int,
-  cy : Int,
-  size : Int,
+  cx : Int32,
+  cy : Int32,
+  size : Int32,
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   for dy = -4; dy <= 4; dy = dy + 1 {
     for dx = -4; dx <= 4; dx = dx + 1 {
@@ -308,11 +332,12 @@ fn draw_finder(
   }
 }
 
+///|
 fn draw_alignment(
-  cx : Int,
-  cy : Int,
+  cx : Int32,
+  cy : Int32,
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   for dy = -2; dy <= 2; dy = dy + 1 {
     for dx = -2; dx <= 2; dx = dx + 1 {
@@ -322,8 +347,9 @@ fn draw_alignment(
   }
 }
 
+///|
 /// Alignment pattern positions for version.
-pub fn alignment_pattern_positions(version : Int) -> FixedArray[Int] {
+pub fn alignment_pattern_positions(version : Int32) -> FixedArray[Int32] {
   if version == 1 {
     return FixedArray::make(0, 0)
   }
@@ -331,7 +357,7 @@ pub fn alignment_pattern_positions(version : Int) -> FixedArray[Int] {
   let step = if numalign == 1 {
     0
   } else {
-    ((version * 8 + numalign * 3 + 5) / (numalign * 4 - 4)) * 2
+    (version * 8 + numalign * 3 + 5) / (numalign * 4 - 4) * 2
   }
   let size = version * 4 + 17
   let result = FixedArray::make(numalign, 0)
@@ -342,12 +368,13 @@ pub fn alignment_pattern_positions(version : Int) -> FixedArray[Int] {
   result
 }
 
+///|
 fn draw_format_bits(
-  size : Int,
+  size : Int32,
   level : EccLevel,
-  mask : Int,
+  mask : Int32,
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   let data = (format_bits(level) << 3) | mask
   let mut rem = data
@@ -375,11 +402,12 @@ fn draw_format_bits(
   set_function(8, size - 8, true, modules, isfunction)
 }
 
+///|
 fn draw_version_info(
-  version : Int,
-  size : Int,
+  version : Int32,
+  size : Int32,
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   if version < 7 {
     return
@@ -398,17 +426,19 @@ fn draw_version_info(
   }
 }
 
-fn get_bit(x : Int, i : Int) -> Bool {
+///|
+fn get_bit(x : Int32, i : Int32) -> Bool {
   ((x >> i) & 1) == 1
 }
 
+///|
 /// Draw codeword bits in zigzag scan, skipping function modules.
 fn draw_codewords(
-  version : Int,
-  size : Int,
-  data : FixedArray[Int],
+  version : Int32,
+  size : Int32,
+  data : FixedArray[Int32],
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   let mut i = 0
   let mut right = size - 1
@@ -431,11 +461,12 @@ fn draw_codewords(
   }
 }
 
+///|
 fn apply_mask(
-  size : Int,
-  mask : Int,
+  size : Int32,
+  mask : Int32,
   modules : FixedArray[FixedArray[Bool]],
-  isfunction : FixedArray[FixedArray[Bool]]
+  isfunction : FixedArray[FixedArray[Bool]],
 ) -> Unit {
   for y = 0; y < size; y = y + 1 {
     for x = 0; x < size; x = x + 1 {
@@ -446,21 +477,26 @@ fn apply_mask(
   }
 }
 
-fn mask_pattern(mask : Int, x : Int, y : Int) -> Bool {
+///|
+fn mask_pattern(mask : Int32, x : Int32, y : Int32) -> Bool {
   match mask {
     0 => (x + y) % 2 == 0
     1 => y % 2 == 0
     2 => x % 3 == 0
     3 => (x + y) % 3 == 0
     4 => (x / 3 + y / 2) % 2 == 0
-    5 => (x * y) % 2 + (x * y) % 3 == 0
-    6 => ((x * y) % 2 + (x * y) % 3) % 2 == 0
-    _ => ((x + y) % 2 + (x * y) % 3) % 2 == 0
+    5 => x * y % 2 + x * y % 3 == 0
+    6 => (x * y % 2 + x * y % 3) % 2 == 0
+    _ => ((x + y) % 2 + x * y % 3) % 2 == 0
   }
 }
 
+///|
 /// Penalty score for mask selection (ISO/IEC 18004 rules N1-N4).
-fn get_penalty_score(size : Int, modules : FixedArray[FixedArray[Bool]]) -> Int {
+fn get_penalty_score(
+  size : Int32,
+  modules : FixedArray[FixedArray[Bool]],
+) -> Int32 {
   let mut result = 0
   // N1 + N3: rows.
   for y = 0; y < size; y = y + 1 {
@@ -474,7 +510,9 @@ fn get_penalty_score(size : Int, modules : FixedArray[FixedArray[Bool]]) -> Int 
   for y = 0; y < size - 1; y = y + 1 {
     for x = 0; x < size - 1; x = x + 1 {
       let c = modules[y][x]
-      if c == modules[y][x + 1] && c == modules[y + 1][x] && c == modules[y + 1][x + 1] {
+      if c == modules[y][x + 1] &&
+        c == modules[y + 1][x] &&
+        c == modules[y + 1][x + 1] {
         result = result + 3
       }
     }
@@ -494,13 +532,14 @@ fn get_penalty_score(size : Int, modules : FixedArray[FixedArray[Bool]]) -> Int 
   result
 }
 
+///|
 /// Penalty for one row (is_row=true) or one column: N1 runs + N3 finder-like.
 fn penalty_line(
-  size : Int,
-  fixed : Int,
+  size : Int32,
+  fixed : Int32,
   is_row : Bool,
-  modules : FixedArray[FixedArray[Bool]]
-) -> Int {
+  modules : FixedArray[FixedArray[Bool]],
+) -> Int32 {
   let mut result = 0
   let mut runcolor = false
   let mut runlen = 0
@@ -523,31 +562,44 @@ fn penalty_line(
     if pos == 0 {
       runcolor = c
       runlen = 1
-    } else {
-      if c == runcolor {
-        runlen = runlen + 1
-        if runlen == 5 {
-          result = result + 3
-        } else if runlen > 5 {
-          result = result + 1
-        }
-      } else {
-        runcolor = c
-        runlen = 1
+    } else if c == runcolor {
+      runlen = runlen + 1
+      if runlen == 5 {
+        result = result + 3
+      } else if runlen > 5 {
+        result = result + 1
       }
+    } else {
+      runcolor = c
+      runlen = 1
     }
   }
   result
 }
 
-fn abs_int(x : Int) -> Int {
-  if x < 0 { -x } else { x }
+///|
+fn abs_int(x : Int32) -> Int32 {
+  if x < 0 {
+    -x
+  } else {
+    x
+  }
 }
 
-fn max_int(a : Int, b : Int) -> Int {
-  if a > b { a } else { b }
+///|
+fn max_int(a : Int32, b : Int32) -> Int32 {
+  if a > b {
+    a
+  } else {
+    b
+  }
 }
 
-fn min_int(a : Int, b : Int) -> Int {
-  if a < b { a } else { b }
+///|
+fn min_int(a : Int32, b : Int32) -> Int32 {
+  if a < b {
+    a
+  } else {
+    b
+  }
 }
