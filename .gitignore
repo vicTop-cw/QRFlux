@@ -4,3 +4,6 @@ target/
 target
 .mooncakes/
 .moonagent/
+*.generated.mbti
+dynamic_batch.txt
+e2e_probe/

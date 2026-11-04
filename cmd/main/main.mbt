@@ -58,6 +58,25 @@ fn hex2(b : Int32) -> String {
 }
 
 ///|
+/// Parse a non-empty decimal string to a positive Int32.
+/// Returns None on empty input or non-digit characters.
+fn parse_int(s : String) -> Int32? {
+  let chars = s.to_array()
+  if chars.length() == 0 {
+    return None
+  }
+  let mut result = 0
+  for i = 0; i < chars.length(); i = i + 1 {
+    let c = chars[i].to_int()
+    if c < 0x30 || c > 0x39 {
+      return None
+    }
+    result = result * 10 + (c - 0x30)
+  }
+  Some(result)
+}
+
+///|
 /// Compute byte-mode capacity for a given version and ECC level using the
 /// encoder's own functions, ensuring consistency with encode_binary.
 /// capacity = (num_data_codewords * 8 - 4 (mode) - char_count_bits) / 8
@@ -306,6 +325,13 @@ fn print_usage() -> Unit {
   println(
     "      --encode-static      use static pipeline (compress + package header)",
   )
+  println(
+    "      --encode-dynamic     use dynamic stream pipeline (split into frames,",
+  )
+  println("                            one QR per frame, supports >1KB data)")
+  println(
+    "      --frame-size <n>     per-frame payload bytes (default 500, dynamic)",
+  )
   println("")
   println("Formats:")
   println("  pbm  - Portable Bitmap ASCII (P1), text output")
@@ -316,6 +342,86 @@ fn print_usage() -> Unit {
 }
 
 ///|
+/// Emit a dynamic-stream DYNAMIC_CASE block for one frame.
+/// Outputs the QR matrix plus the full frame bytes (header + payload) as
+/// hex, so an external decoder can recover the frame bytes and reassemble.
+fn emit_dynamic_case(
+  label : String,
+  frame : FixedArray[Int32],
+  frame_idx : Int32,
+  total_frames : Int32,
+  ecl : String,
+) -> Unit {
+  let level = ecl_from_name(ecl)
+  let qr = @qr.encode_binary(frame, level, 1)
+  println(
+    "DYNAMIC_CASE " +
+    label +
+    " frame=" +
+    frame_idx.to_string() +
+    "/" +
+    total_frames.to_string() +
+    " frame_len=" +
+    frame.length().to_string() +
+    " ecl=" +
+    ecl +
+    " version=" +
+    qr.version().to_string() +
+    " size=" +
+    qr.size().to_string() +
+    " mask=" +
+    qr.mask().to_string(),
+  )
+  emit_matrix(qr)
+  // Emit full frame bytes (header + payload) as hex for reassembly verification.
+  let mut hex = "FRAME_HEX "
+  for i = 0; i < frame.length(); i = i + 1 {
+    hex = hex + hex2(frame[i])
+  }
+  println(hex)
+  println("END_DYNAMIC")
+}
+
+///|
+/// Run dynamic stream encoding: split data into frames, encode each frame
+/// as a QR, and emit DYNAMIC_CASE blocks to stdout.
+fn run_dynamic(
+  data : FixedArray[Int32],
+  ecl : String,
+  frame_size : Int32,
+  label : String,
+) -> Unit {
+  // Guard: frame_size must be positive; clamp to a safe lower bound.
+  let fs = if frame_size < 1 { 1 } else { frame_size }
+  let frames = @qr.split_into_frames(data, fs)
+  let total = frames.length()
+  if total == 0 {
+    println(
+      "# dynamic: no frames (data_len=" +
+      data.length().to_string() +
+      ", frame_size=" +
+      fs.to_string() +
+      ")",
+    )
+    return
+  }
+  // Emit a summary header line first.
+  println(
+    "# dynamic: data_len=" +
+    data.length().to_string() +
+    " frame_size=" +
+    fs.to_string() +
+    " total_frames=" +
+    total.to_string() +
+    " ecl=" +
+    ecl,
+  )
+  for i = 0; i < total; i = i + 1 {
+    emit_dynamic_case(label, frames[i], i, total, ecl)
+  }
+}
+
+///|
 /// Run CLI mode: parse arguments and generate a single QR image.
 fn run_cli(args : Array[String]) -> Unit {
   let mut text : String = ""
@@ -323,6 +429,8 @@ fn run_cli(args : Array[String]) -> Unit {
   let mut ecl : String = "M"
   let mut format : String = "pbm"
   let mut use_static : Bool = false
+  let mut use_dynamic : Bool = false
+  let mut frame_size : Int32 = 500
   let mut i = 1
   while i < args.length() {
     let a = args[i]
@@ -344,6 +452,16 @@ fn run_cli(args : Array[String]) -> Unit {
       }
     } else if a == "--encode-static" {
       use_static = true
+    } else if a == "--encode-dynamic" {
+      use_dynamic = true
+    } else if a == "--frame-size" {
+      i = i + 1
+      if i < args.length() {
+        match parse_int(args[i]) {
+          Some(n) => if n > 0 { frame_size = n }
+          None => ()
+        }
+      }
     } else if a == "--output" {
       i = i + 1
     } else if a == "--help" || a == "-h" {
@@ -360,6 +478,12 @@ fn run_cli(args : Array[String]) -> Unit {
   }
   let data = utf8_to_bytes(text)
   let level = ecl_from_name(ecl)
+  if use_dynamic {
+    // Dynamic stream pipeline: split into frames, one QR per frame.
+    // Emit DYNAMIC_CASE blocks (matrix + frame hex) to stdout.
+    run_dynamic(data, ecl, frame_size, "cli")
+    return
+  }
   if use_static {
     let result = @qr.encode_static(data, level, 1)
     match result {

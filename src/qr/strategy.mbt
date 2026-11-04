@@ -312,9 +312,18 @@ pub fn decompress_with_strategy(
 
 ///|
 /// Auto-compress data: select strategy and compress.
+/// If the chosen strategy makes the data larger (or equal), fall back to
+/// NoCompress to avoid expansion. This guards against cases like random
+/// data with len > 1000 where select_strategy returns Balanced (mapped to
+/// Fast/RLE), and RLE expands random data ~2x.
 pub fn auto_compress(data : FixedArray[Int32]) -> CompressionResult {
   let strategy = select_strategy(data)
-  compress_with_strategy(data, strategy)
+  let result = compress_with_strategy(data, strategy)
+  if result.compressed_size >= result.original_size {
+    compress_with_strategy(data, CompressionStrategy::NoCompress)
+  } else {
+    result
+  }
 }
 
 ///|

@@ -115,8 +115,8 @@ test "png ihdr chunk v1" {
   assert_true(png[21] == 0)
   assert_true(png[22] == 0)
   assert_true(png[23] == 29)
-  // bit depth = 8, color type = 0 (grayscale)
-  assert_true(png[24] == 8)
+  // bit depth = 1, color type = 0 (grayscale)
+  assert_true(png[24] == 1)
   assert_true(png[25] == 0)
   assert_true(png[26] == 0)
   assert_true(png[27] == 0)
@@ -138,15 +138,16 @@ test "png idat chunk v1" {
   // IDAT data starts at 41: zlib header 0x78 0x01
   assert_true(png[41] == 0x78)
   assert_true(png[42] == 0x01)
-  // V1 quiet 4 scale 1: raw_len = 29 * 30 = 870 < 65535, single stored block
+  // V1 quiet 4 scale 1 bit_depth=1: row_bytes=ceil(29/8)=4, row_len=5
+  // raw_len = 29 * 5 = 145 < 65535, single stored block
   // BFINAL = 1
   assert_true(png[43] == 1)
-  // LEN = 870 = 0x0366, little-endian: 0x66 0x03
-  assert_true(png[44] == 0x66)
-  assert_true(png[45] == 0x03)
-  // NLEN = ~870 & 0xFFFF = 0xFC99, little-endian: 0x99 0xFC
-  assert_true(png[46] == 0x99)
-  assert_true(png[47] == 0xFC)
+  // LEN = 145 = 0x0091, little-endian: 0x91 0x00
+  assert_true(png[44] == 0x91)
+  assert_true(png[45] == 0x00)
+  // NLEN = ~145 & 0xFFFF = 0xFF6E, little-endian: 0x6E 0xFF
+  assert_true(png[46] == 0x6E)
+  assert_true(png[47] == 0xFF)
 }
 
 ///|
@@ -195,7 +196,7 @@ test "png v5 scale 2 quiet 2" {
   assert_true(png[18] == 0)
   assert_true(png[19] == 82)
   assert_true(png[23] == 82)
-  assert_true(png[24] == 8)
+  assert_true(png[24] == 1)
   // IEND present
   let n = png.length()
   assert_true(png[n - 8] == 73)
@@ -206,14 +207,15 @@ test "png v5 scale 2 quiet 2" {
 
 ///|
 test "png total length v1" {
-  // V1 quiet 4 scale 1: width=height=29, raw_len=29*30=870
-  // IDAT: 2 (zlib) + 5 (stored header) + 870 (data) + 4 (adler) = 881
+  // V1 quiet 4 scale 1 bit_depth=1: width=height=29
+  // row_bytes=ceil(29/8)=4, row_len=5, raw_len=29*5=145
+  // IDAT: 2 (zlib) + 5 (stored header) + 145 (data) + 4 (adler) = 156
   // IHDR chunk: 12 + 13 = 25
-  // IDAT chunk: 12 + 881 = 893
+  // IDAT chunk: 12 + 156 = 168
   // IEND chunk: 12 + 0 = 12
-  // Total: 8 + 25 + 893 + 12 = 938
+  // Total: 8 + 25 + 168 + 12 = 213
   let data = FixedArray::make(5, 0x41)
   let qr = @qr.encode_binary(data, @qr.ecc_low(), 1)
   let png = @qr.to_png(qr, 1, 4)
-  assert_true(png.length() == 938)
+  assert_true(png.length() == 213)
 }

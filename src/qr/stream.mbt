@@ -174,6 +174,9 @@ pub fn split_into_frames(
 
 ///|
 /// Reassemble data from frames.
+/// Frames may arrive in ANY order; reassembly sorts by current_frame
+/// before concatenating payloads. Returns None on missing/duplicate frames,
+/// bad magic/version, or checksum mismatch.
 pub fn reassemble_frames(
   frames : Array[FixedArray[Int32]],
 ) -> FixedArray[Int32]? {
@@ -181,57 +184,73 @@ pub fn reassemble_frames(
     return None
   }
 
-  // Parse first frame to get metadata
-  let first_frame = frames[0]
-  let header_opt = FrameHeader::from_bytes(first_frame)
-  match header_opt {
-    Some(header) => {
-      let total_frames = header.total_frames
-      let expected_checksum = header.checksum
-
-      // Verify frame count
-      if frames.length() != total_frames {
-        return None
-      }
-
-      // Reassemble data
-      let total_data_len = header.data_length
-      let data = FixedArray::make(total_data_len, 0)
-      let mut offset = 0
-
-      for i = 0; i < total_frames; i = i + 1 {
-        let frame = frames[i]
-        let header_opt = FrameHeader::from_bytes(frame)
-        match header_opt {
-          Some(hdr) => {
-            // Verify frame index
-            if hdr.current_frame != i {
-              return None
-            }
-
-            // Calculate actual payload length for this frame
-            let frame_payload_len = frame.length() - 16
-
-            // Copy payload
-            for j = 0; j < frame_payload_len; j = j + 1 {
-              if offset + j < total_data_len {
-                data[offset + j] = frame[16 + j]
-              }
-            }
-            offset = offset + frame_payload_len
-          }
-          None => return None
-        }
-      }
-
-      // Verify checksum
-      let actual_checksum = crc16(data)
-      if actual_checksum != expected_checksum {
-        return None
-      }
-
-      Some(data)
+  // Parse all frame headers first.
+  let headers : Array[FrameHeader] = Array::make(
+    0,
+    FrameHeader::make(0, 0, 0, 0),
+  )
+  for i = 0; i < frames.length(); i = i + 1 {
+    match FrameHeader::from_bytes(frames[i]) {
+      Some(h) => headers.push(h)
+      None => return None
     }
-    None => None
   }
+
+  // Use first header for metadata (total_frames, data_length, checksum).
+  let first = headers[0]
+  let total_frames = first.total_frames
+  let expected_checksum = first.checksum
+  let total_data_len = first.data_length
+
+  // Verify frame count.
+  if frames.length() != total_frames {
+    return None
+  }
+
+  // Sort frames by current_frame (stable insertion sort by index).
+  // Build index array [0, 1, ..., n-1] and sort by headers[idx].current_frame.
+  let order : Array[Int32] = Array::make(frames.length(), 0)
+  for i = 0; i < frames.length(); i = i + 1 {
+    order[i] = i
+  }
+  // Insertion sort on `order` by current_frame ascending.
+  for i = 1; i < order.length(); i = i + 1 {
+    let key = order[i]
+    let key_cf = headers[key].current_frame
+    let mut j = i - 1
+    while j >= 0 && headers[order[j]].current_frame > key_cf {
+      order[j + 1] = order[j]
+      j = j - 1
+    }
+    order[j + 1] = key
+  }
+
+  // Verify sorted indices form a contiguous 0..total_frames-1 sequence.
+  for i = 0; i < total_frames; i = i + 1 {
+    if headers[order[i]].current_frame != i {
+      return None
+    }
+  }
+
+  // Reassemble data in sorted order.
+  let data = FixedArray::make(total_data_len, 0)
+  let mut offset = 0
+  for i = 0; i < total_frames; i = i + 1 {
+    let frame = frames[order[i]]
+    let frame_payload_len = frame.length() - 16
+    for j = 0; j < frame_payload_len; j = j + 1 {
+      if offset + j < total_data_len {
+        data[offset + j] = frame[16 + j]
+      }
+    }
+    offset = offset + frame_payload_len
+  }
+
+  // Verify checksum.
+  let actual_checksum = crc16(data)
+  if actual_checksum != expected_checksum {
+    return None
+  }
+
+  Some(data)
 }

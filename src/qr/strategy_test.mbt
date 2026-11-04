@@ -109,3 +109,43 @@ test "strategy constructors" {
   assert_true(s3 == @qr.strategy_best_speed())
   assert_true(s4 == @qr.strategy_balanced())
 }
+
+///|
+/// Regression: auto_compress must never expand random data.
+/// Previously, for len > 1000 low-repeat data, select_strategy returned
+/// Balanced (mapped to Fast/RLE), and RLE expanded random data ~2x with
+/// no fallback. After the fix, auto_compress falls back to NoCompress.
+test "auto compress random data no expansion" {
+  // Generate 2000 bytes of low-repeat random data (repeat_ratio ~ 0).
+  let n = 2000
+  let data = FixedArray::make(n, 0)
+  let mut seed = 12345
+  for i = 0; i < n; i = i + 1 {
+    seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+    data[i] = (seed >> 16) & 0xFF
+  }
+  let result = @qr.auto_compress(data)
+  // compressed_size must NOT exceed original_size.
+  assert_true(result.compressed_size <= result.original_size)
+  // ratio must be <= 1.0.
+  assert_true(result.ratio <= 1.0)
+  // For random data the fallback should pick NoCompress, so sizes match.
+  assert_true(result.compressed_size == result.original_size)
+}
+
+///|
+/// Regression: auto_compress on tiny data still works (no expansion path).
+test "auto compress tiny data no expansion" {
+  let data = FixedArray::make(5, 0x42)
+  let result = @qr.auto_compress(data)
+  assert_true(result.compressed_size <= result.original_size)
+}
+
+///|
+/// Regression: auto_compress on highly repetitive data still compresses.
+test "auto compress repetitive data still compresses" {
+  let data = FixedArray::make(2000, 0xAA)
+  let result = @qr.auto_compress(data)
+  assert_true(result.compressed_size < result.original_size)
+  assert_true(result.ratio < 1.0)
+}

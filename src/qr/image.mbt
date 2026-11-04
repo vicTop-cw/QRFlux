@@ -156,8 +156,11 @@ fn png_chunk(
 }
 
 ///|
-/// Generate PNG format image (grayscale, bit_depth=8) as byte array.
+/// Generate PNG format image (grayscale, bit_depth=1) as byte array.
 /// Uses deflate "stored" blocks (no compression) to avoid full zlib.
+/// bit_depth=1 packs 8 pixels per byte (MSB first), ~8x smaller than bit_depth=8.
+/// PNG grayscale bit_depth=1: 0=black, 1=white.
+/// QR module: 1=black, 0=white, so PNG bit = 1 - QR module.
 /// qr: QR code object, scale: pixels per module, quiet_zone: quiet zone size
 /// Returns: PNG binary data (FixedArray[Int32], each 0~255)
 pub fn to_png(
@@ -169,9 +172,10 @@ pub fn to_png(
   let total = size + quiet_zone * 2
   let width = total * scale
   let height = total * scale
-  // Build raw image data: each row = 1 filter byte (0) + width pixel bytes
-  // pixel: 0 = black, 255 = white
-  let row_len = 1 + width
+  // bit_depth=1: each row = 1 filter byte (0) + ceil(width/8) packed bytes
+  // MSB first: pixel 0 -> bit 7, pixel 1 -> bit 6, ...
+  let row_bytes = (width + 7) / 8
+  let row_len = 1 + row_bytes
   let raw_len = height * row_len
   let raw = FixedArray::make(raw_len, 0)
   for y = 0; y < total; y = y + 1 {
@@ -184,12 +188,16 @@ pub fn to_png(
       } else {
         qr.get_module(x - quiet_zone, y - quiet_zone)
       }
-      let pixel : Int32 = if dark { 0 } else { 255 }
+      // PNG bit: 0=black (QR dark), 1=white (QR light)
+      let bit : Int32 = if dark { 0 } else { 1 }
       for dy = 0; dy < scale; dy = dy + 1 {
         let row = (y * scale + dy) * row_len
-        raw[row] = 0
+        raw[row] = 0 // filter type = None
         for dx = 0; dx < scale; dx = dx + 1 {
-          raw[row + 1 + x * scale + dx] = pixel
+          let px = x * scale + dx
+          let byte_idx = px / 8
+          let bit_pos = 7 - px % 8
+          raw[row + 1 + byte_idx] = raw[row + 1 + byte_idx] | (bit << bit_pos)
         }
       }
     }
@@ -204,7 +212,7 @@ pub fn to_png(
   ihdr[5] = (height >> 16) & 0xFF
   ihdr[6] = (height >> 8) & 0xFF
   ihdr[7] = height & 0xFF
-  ihdr[8] = 8 // bit depth
+  ihdr[8] = 1 // bit depth = 1 (bit-packed grayscale)
   ihdr[9] = 0 // color type (grayscale)
   ihdr[10] = 0 // compression method
   ihdr[11] = 0 // filter method
