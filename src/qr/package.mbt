@@ -10,18 +10,22 @@
 /// +--------------------+
 /// | Flags (1 byte)     | Bit 0: compressed, Bit 1-7: reserved
 /// +--------------------+
+/// | Compression algo   | 0=none, 1=RLE, 2=deflate(reserved)
+/// | (1 byte)           |
+/// +--------------------+
 /// | Data length (4B)   | big-endian, total data length
 /// +--------------------+
 /// | Original size (4B) | big-endian, original data size
 /// +--------------------+
 /// | Checksum (4B)      | big-endian, CRC32
 /// +--------------------+
-/// | Reserved (18B)     | 0x00
+/// | Reserved (13B)     | 0x00
 /// +--------------------+
 pub struct PackageHeader {
   magic : FixedArray[Int32]
   version : Int32
   flags : Int32
+  compression_algo : Int32
   data_length : Int32
   original_size : Int32
   checksum : Int32
@@ -45,12 +49,24 @@ pub const MAGIC_X4 : Int32 = 0x58
 pub const FLAG_COMPRESSED : Int32 = 0x01
 
 ///|
+/// Compression algorithm IDs (numeric, stored in header byte 6).
+/// 0 = no compression, 1 = RLE, 2 = deflate (reserved, unimplemented).
+pub const ALGO_NONE : Int32 = 0
+
+///|
+pub const ALGO_RLE : Int32 = 1
+
+///|
+pub const ALGO_DEFLATE : Int32 = 2
+
+///|
 /// Create a new package header.
 pub fn PackageHeader::make(
   data_length : Int32,
   original_size : Int32,
   checksum : Int32,
   compressed : Bool,
+  compression_algo : Int32,
 ) -> PackageHeader {
   let flags = if compressed { FLAG_COMPRESSED } else { 0 }
   let magic = FixedArray::make(4, 0)
@@ -58,7 +74,15 @@ pub fn PackageHeader::make(
   magic[1] = MAGIC_R2
   magic[2] = MAGIC_F3
   magic[3] = MAGIC_X4
-  { magic, version: 1, flags, data_length, original_size, checksum, }
+  {
+    magic,
+    version: 1,
+    flags,
+    compression_algo,
+    data_length,
+    original_size,
+    checksum,
+  }
 }
 
 ///|
@@ -74,22 +98,24 @@ pub fn PackageHeader::to_bytes(self : PackageHeader) -> FixedArray[Int32] {
   bytes[4] = self.version
   // Flags (1 byte)
   bytes[5] = self.flags
+  // Compression algorithm ID (1 byte)
+  bytes[6] = self.compression_algo
   // Data length (4 bytes, big-endian)
-  bytes[6] = (self.data_length >> 24) & 0xFF
-  bytes[7] = (self.data_length >> 16) & 0xFF
-  bytes[8] = (self.data_length >> 8) & 0xFF
-  bytes[9] = self.data_length & 0xFF
+  bytes[7] = (self.data_length >> 24) & 0xFF
+  bytes[8] = (self.data_length >> 16) & 0xFF
+  bytes[9] = (self.data_length >> 8) & 0xFF
+  bytes[10] = self.data_length & 0xFF
   // Original size (4 bytes, big-endian)
-  bytes[10] = (self.original_size >> 24) & 0xFF
-  bytes[11] = (self.original_size >> 16) & 0xFF
-  bytes[12] = (self.original_size >> 8) & 0xFF
-  bytes[13] = self.original_size & 0xFF
+  bytes[11] = (self.original_size >> 24) & 0xFF
+  bytes[12] = (self.original_size >> 16) & 0xFF
+  bytes[13] = (self.original_size >> 8) & 0xFF
+  bytes[14] = self.original_size & 0xFF
   // Checksum (4 bytes, big-endian)
-  bytes[14] = (self.checksum >> 24) & 0xFF
-  bytes[15] = (self.checksum >> 16) & 0xFF
-  bytes[16] = (self.checksum >> 8) & 0xFF
-  bytes[17] = self.checksum & 0xFF
-  // Reserved (18 bytes) - already 0
+  bytes[15] = (self.checksum >> 24) & 0xFF
+  bytes[16] = (self.checksum >> 16) & 0xFF
+  bytes[17] = (self.checksum >> 8) & 0xFF
+  bytes[18] = self.checksum & 0xFF
+  // Reserved (13 bytes) - already 0
   bytes
 }
 
@@ -117,25 +143,40 @@ pub fn PackageHeader::from_bytes(bytes : FixedArray[Int32]) -> PackageHeader? {
   magic[3] = bytes[3]
   let version = bytes[4]
   let flags = bytes[5]
-  let data_length = (bytes[6] << 24) |
-    (bytes[7] << 16) |
-    (bytes[8] << 8) |
-    bytes[9]
-  let original_size = (bytes[10] << 24) |
-    (bytes[11] << 16) |
-    (bytes[12] << 8) |
-    bytes[13]
-  let checksum = (bytes[14] << 24) |
-    (bytes[15] << 16) |
-    (bytes[16] << 8) |
-    bytes[17]
-  Some({ magic, version, flags, data_length, original_size, checksum, })
+  let compression_algo = bytes[6]
+  let data_length = (bytes[7] << 24) |
+    (bytes[8] << 16) |
+    (bytes[9] << 8) |
+    bytes[10]
+  let original_size = (bytes[11] << 24) |
+    (bytes[12] << 16) |
+    (bytes[13] << 8) |
+    bytes[14]
+  let checksum = (bytes[15] << 24) |
+    (bytes[16] << 16) |
+    (bytes[17] << 8) |
+    bytes[18]
+  Some({
+    magic,
+    version,
+    flags,
+    compression_algo,
+    data_length,
+    original_size,
+    checksum,
+  })
 }
 
 ///|
 /// Check if package is compressed.
 pub fn PackageHeader::is_compressed(self : PackageHeader) -> Bool {
   (self.flags & FLAG_COMPRESSED) != 0
+}
+
+///|
+/// Get compression algorithm ID.
+pub fn PackageHeader::compression_algo(self : PackageHeader) -> Int32 {
+  self.compression_algo
 }
 
 ///|
@@ -158,8 +199,10 @@ pub fn crc32(data : FixedArray[Int32]) -> Int32 {
 ///|
 /// Package data with header.
 /// Returns: header (32 bytes) + payload
+/// compression_algo: 0=none, 1=RLE, 2=deflate(reserved)
 pub fn package_with_header(
   data : FixedArray[Int32],
+  compression_algo : Int32,
   compressed : Bool,
 ) -> FixedArray[Int32] {
   let checksum = crc32(data)
@@ -168,6 +211,7 @@ pub fn package_with_header(
     data.length(),
     checksum,
     compressed,
+    compression_algo,
   )
   let header_bytes = header.to_bytes()
 
@@ -184,10 +228,10 @@ pub fn package_with_header(
 
 ///|
 /// Unpackage data from header + payload.
-/// Returns: (payload, original_size, compressed)
+/// Returns: (payload, original_size, compressed, compression_algo)
 pub fn unpackage_from_header(
   pkg : FixedArray[Int32],
-) -> (FixedArray[Int32], Int32, Bool)? {
+) -> (FixedArray[Int32], Int32, Bool, Int32)? {
   if pkg.length() < 32 {
     return None
   }
@@ -217,7 +261,7 @@ pub fn unpackage_from_header(
         return None
       }
 
-      Some((payload, h.original_size, h.is_compressed()))
+      Some((payload, h.original_size, h.is_compressed(), h.compression_algo))
     }
     None => None
   }

@@ -82,7 +82,7 @@ test "compress empty data" {
 ///|
 test "package empty data" {
   let data = FixedArray::make(0, 0)
-  let pkg = @qr.package_with_header(data, false)
+  let pkg = @qr.package_with_header(data, 0, false)
   assert_true(pkg.length() > 0)
 
   let result = @qr.unpackage_from_header(pkg)
@@ -92,7 +92,7 @@ test "package empty data" {
 ///|
 test "package corrupted header" {
   let data = FixedArray::make(50, 0x99)
-  let pkg = @qr.package_with_header(data, false)
+  let pkg = @qr.package_with_header(data, 0, false)
 
   // Corrupt magic bytes
   pkg[0] = 0x00
