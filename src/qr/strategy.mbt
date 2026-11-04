@@ -14,6 +14,9 @@ pub enum CompressionStrategy {
 pub extend CompressionStrategy with Eq::{not_equal, equal}
 
 ///|
+pub extend CompressionStrategy with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 /// Convenience constructors.
 pub fn strategy_no_compress() -> CompressionStrategy {
   NoCompress
@@ -44,6 +47,9 @@ pub enum CompressionLevel {
 
 ///|
 pub extend CompressionLevel with Eq::{not_equal, equal}
+
+///|
+pub extend CompressionLevel with @moonbitlang/core/debug.Debug::{to_repr}
 
 ///|
 pub fn no_compress() -> CompressionLevel {

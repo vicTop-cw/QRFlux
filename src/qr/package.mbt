@@ -181,19 +181,23 @@ pub fn PackageHeader::compression_algo(self : PackageHeader) -> Int32 {
 
 ///|
 /// Simple CRC32 checksum.
+/// Uses logical right shift emulated via (x >> 1) & 0x7FFFFFFF to produce
+/// standard CRC32 values (poly 0xEDB88320) for both positive and negative
+/// Int32 intermediates. Arithmetic >> alone would give non-standard values
+/// when crc becomes negative (high bit set).
 pub fn crc32(data : FixedArray[Int32]) -> Int32 {
-  let mut crc = 0xFFFFFFFF
+  let mut crc : Int32 = 0xFFFFFFFF
   for i = 0; i < data.length(); i = i + 1 {
     crc = crc ^ data[i]
     for j = 0; j < 8; j = j + 1 {
       if (crc & 1) != 0 {
-        crc = (crc >> 1) ^ 0xEDB88320
+        crc = ((crc >> 1) & 0x7FFFFFFF) ^ 0xEDB88320
       } else {
-        crc = crc >> 1
+        crc = (crc >> 1) & 0x7FFFFFFF
       }
     }
   }
-  crc ^ 0xFFFFFFFF
+  (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF
 }
 
 ///|

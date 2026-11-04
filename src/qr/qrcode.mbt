@@ -443,7 +443,7 @@ fn get_bit(x : Int32, i : Int32) -> Bool {
 ///|
 /// Draw codeword bits in zigzag scan, skipping function modules.
 fn draw_codewords(
-  version : Int32,
+  _version : Int32,
   size : Int32,
   data : FixedArray[Int32],
   modules : FixedArray[FixedArray[Bool]],

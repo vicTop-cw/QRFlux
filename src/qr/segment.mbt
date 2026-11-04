@@ -8,6 +8,21 @@ pub enum Mode {
 }
 
 ///|
+pub fn mode_numeric() -> Mode {
+  Numeric
+}
+
+///|
+pub fn mode_alphanumeric() -> Mode {
+  Alphanumeric
+}
+
+///|
+pub fn mode_byte() -> Mode {
+  Byte
+}
+
+///|
 /// Segment mode indicator bits (4 bits each).
 pub fn mode_bits(m : Mode) -> Int32 {
   match m {

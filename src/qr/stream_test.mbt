@@ -75,7 +75,7 @@ test "reassemble missing frame" {
   let frames = @qr.split_into_frames(data, 32)
 
   // Remove a frame
-  let frames_copy = Array::new()
+  let frames_copy = Array(capacity=frames.length())
   for i = 0; i < frames.length(); i = i + 1 {
     if i != 2 {
       frames_copy.push(frames[i])

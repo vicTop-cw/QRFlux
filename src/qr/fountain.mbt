@@ -174,7 +174,7 @@ pub fn LTFountain::decode(
     let mut progress = false
 
     for i = 0; i < encoded_blocks.length(); i = i + 1 {
-      let (seed, encoded) = encoded_blocks[i]
+      let (_, encoded) = encoded_blocks[i]
       let nb = neighbors[i]
 
       // Count unresolved neighbors

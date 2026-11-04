@@ -29,8 +29,20 @@ test "crc32 basic" {
   data[2] = 0x03
   data[3] = 0x04
   let crc = @qr.crc32(data)
-  // CRC32 should be a valid 32-bit value
-  assert_true(crc >= 0)
+  // Standard CRC32([0x01,0x02,0x03,0x04]) = 0xB63CFBCD = 3057449933.
+  // As signed Int32 this is -1237517363 (high bit set).
+  // Variant contrast: if crc32 reverts to arithmetic >> without & 0x7FFFFFFF,
+  // this assertion fails — the buggy shift produces a different value.
+  assert_true(crc == -1237517363)
+}
+
+///|
+test "crc32 variant: 100 bytes of 0x42" {
+  let data = FixedArray::make(100, 0x42)
+  let crc = @qr.crc32(data)
+  // Standard CRC32(100 * 0x42) = 535209010 (positive, fits in Int31).
+  // Variant contrast: arithmetic >> bug would give a different value.
+  assert_true(crc == 535209010)
 }
 
 ///|
@@ -62,7 +74,7 @@ test "package and unpackage compressed" {
 
   let result = @qr.unpackage_from_header(pkg)
   assert_true(result is Some(_))
-  let (payload, original_size, is_compressed, algo) = result.unwrap()
+  let (_, original_size, is_compressed, algo) = result.unwrap()
 
   assert_true(is_compressed)
   assert_true(original_size == 50)

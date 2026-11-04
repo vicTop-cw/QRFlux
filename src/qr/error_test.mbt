@@ -106,5 +106,8 @@ test "package corrupted header" {
 test "crc32 empty data" {
   let data = FixedArray::make(0, 0)
   let crc = @qr.crc32(data)
-  assert_true(crc >= 0)
+  // Standard CRC32 of empty input = 0.
+  // Variant contrast: any shift bug still yields 0 here (no iterations),
+  // so this guards the init/final XOR path rather than the shift.
+  assert_true(crc == 0)
 }

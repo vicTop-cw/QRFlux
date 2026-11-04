@@ -15,6 +15,9 @@ pub enum ColorQRColor {
 pub extend ColorQRColor with Eq::{not_equal, equal}
 
 ///|
+pub extend ColorQRColor with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 /// Convenience constructors.
 pub fn color_white() -> ColorQRColor {
   White

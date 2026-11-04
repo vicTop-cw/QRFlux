@@ -101,9 +101,9 @@ fn adler32(data : FixedArray[Int32]) -> Int32 {
 
 ///|
 /// PNG CRC32 using logical right shift.
-/// The package-level crc32 uses arithmetic shift (>>) which gives non-standard
-/// values for negative Int32; PNG requires standard CRC32 (poly 0xEDB88320).
-/// We emulate logical shift via (x >> 1) & 0x7FFFFFFF which clears the sign bit.
+/// Now identical to the package-level crc32 (which was fixed to use logical
+/// right shift via (x >> 1) & 0x7FFFFFFF). Kept as a separate function to
+/// preserve the png module boundary and allow independent verification.
 fn png_crc32(data : FixedArray[Int32]) -> Int32 {
   let mut crc : Int32 = 0xFFFFFFFF
   for i = 0; i < data.length(); i = i + 1 {
@@ -116,7 +116,7 @@ fn png_crc32(data : FixedArray[Int32]) -> Int32 {
       }
     }
   }
-  crc ^ 0xFFFFFFFF
+  (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF
 }
 
 ///|

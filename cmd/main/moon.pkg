@@ -1,5 +1,6 @@
 import {
   "vicTop-cw/QRFlux/src/qr",
+  "moonbitlang/core/env",
 }
 
 pkgtype(kind: "executable")

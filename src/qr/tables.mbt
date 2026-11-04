@@ -64,6 +64,12 @@ pub enum EccLevel {
 } derive(Eq, Debug)
 
 ///|
+pub extend EccLevel with Eq::{not_equal, equal}
+
+///|
+pub extend EccLevel with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
 pub fn EccLevel::from_string(s : String) -> EccLevel {
   match s {
     "L" | "Low" => Low
