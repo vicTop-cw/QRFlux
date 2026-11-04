@@ -20,10 +20,10 @@ pub fn LTFountain::split(
   self : LTFountain,
   data : FixedArray[Int32],
 ) -> Array[FixedArray[Int32]] {
-  let blocks = Array::make(
-    self.num_blocks,
-    FixedArray::make(self.block_size, 0),
-  )
+  let blocks = Array::make(0, FixedArray::make(0, 0))
+  for i = 0; i < self.num_blocks; i = i + 1 {
+    blocks.push(FixedArray::make(self.block_size, 0))
+  }
 
   for i = 0; i < self.num_blocks; i = i + 1 {
     let start = i * self.block_size
@@ -149,14 +149,17 @@ pub fn LTFountain::decode(
   }
 
   // Initialize original blocks
-  let original_blocks = Array::make(
-    self.num_blocks,
-    FixedArray::make(self.block_size, 0),
-  )
+  let original_blocks = Array::make(0, FixedArray::make(0, 0))
+  for i = 0; i < self.num_blocks; i = i + 1 {
+    original_blocks.push(FixedArray::make(self.block_size, 0))
+  }
   let resolved = Array::make(self.num_blocks, false)
 
   // Build neighbor list for each encoded block
-  let neighbors = Array::make(encoded_blocks.length(), Array::make(0, 0))
+  let neighbors = Array::make(0, Array::make(0, 0))
+  for i = 0; i < encoded_blocks.length(); i = i + 1 {
+    neighbors.push(Array::make(0, 0))
+  }
   for i = 0; i < encoded_blocks.length(); i = i + 1 {
     let (seed, _) = encoded_blocks[i]
     let degree = self.robust_soliton_degree(seed)

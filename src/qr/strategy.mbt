@@ -225,8 +225,8 @@ pub fn decompress(
 ) -> FixedArray[Int32] {
   match level {
     NoCompress => data
-    Fast => rle_decompress(data)
-    Best => rle_decompress(data)
+    Fast => rle_decompress_optimized(data)
+    Best => rle_decompress_optimized(data)
   }
 }
 
