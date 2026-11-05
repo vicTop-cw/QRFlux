@@ -5,7 +5,7 @@
 
 ## 当前状态 (2026-11-05)
 
-### 已完成：18 轮迭代全部通过，项目可发布
+### 已完成：19 轮迭代全部通过，项目可发布
 
 - `src/qr/` 编码器核心：字节模式编码、版本/纠错级选择、GF(256) 域运算、Reed-Solomon ECC、功能图案绘制（finder/timing/alignment/format/version）、掩码选择与惩罚评分。
 - 自研 QR 解码器：V1~V40 全版本、L/M/Q/H 四档纠错、全模式无损还原。
@@ -37,10 +37,10 @@
 - [x] 彩色 QR 无损编解码（4色，2bits/module，RGB 识别）——已完成
 - [x] 前端编解码 UI + 摄像头扫码——已完成
 
-## 验证结果 (iter 18/18 最终验证)
+## 验证结果 (iter 19/19 最终验证)
 
 - `moon fmt` / `moon check`：通过（0 errors，0 warnings）
-- `moon test --target js`：**509/509 通过**（含 110 个无损传输测试 + 84 个薄弱点打磨 + 74 个核心基础模块单元测试覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12 + 62 个白盒测试覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6）（另修复 mask 选择 bug：bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF）
+- `moon test --target js`：**553/553 通过**（含 110 个无损传输测试 + 84 个薄弱点打磨 + 74 个核心基础模块单元测试覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12 + 62 个白盒测试覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6 + 44 个变异对照与彩色 QR 边界测试覆盖变异对照 21（RS 纠错 5 + mask 选择 3 + CRC 3 + RLE 3 + 交错 2 + 解码 3 + 喷泉码 2）+ 彩色 QR 边界 23（颜色工厂 3 + 双射 3 + to_rgb 4 + from_rgb 3 + 编解码 4 + 图片 3 + 错误 1 + RGB 往返 1 + 尺寸 1））（另修复 mask 选择 bug：bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF）
 - 交叉验证（V1~V40 全版本全纠错级全模式）：**165/165 OK**
 - WASM 构建：60895 字节（≈60KB）
 

@@ -7,7 +7,7 @@
 
 **项目名称**：QRFlux (闪码)  
 **项目描述**：纯 MoonBit 二维码无损文件传输  
-**当前状态**：18 轮迭代全部完成，项目处于可发布状态（509/509 单元测试通过，165/165 交叉验证通过，0 warnings，彩色QR+前端UI+摄像头扫码+无损传输深度测试+无损传输压力测试+薄弱点打磨测试+核心基础模块单元测试+decoder/编码器白盒测试+mask选择bug修复全部完成）
+**当前状态**：19 轮迭代全部完成，项目处于可发布状态（553/553 单元测试通过，165/165 交叉验证通过，0 warnings，彩色QR+前端UI+摄像头扫码+无损传输深度测试+无损传输压力测试+薄弱点打磨测试+核心基础模块单元测试+decoder/编码器白盒测试+mask选择bug修复+变异对照测试+彩色QR边界测试全部完成）
 
 ---
 
@@ -199,7 +199,7 @@ T0 (Root) - QRFlux 完整项目
 
 ---
 
-## 18 轮迭代完成总结
+## 19 轮迭代完成总结
 
 | 迭代 | 内容 | 结果 |
 |------|------|------|
@@ -221,14 +221,15 @@ T0 (Root) - QRFlux 完整项目
 | iter(16/18) | 核心基础模块 | gf256域运算18+bits位流15+segment分段15+tables常量表14+图片内容12=74个，373→447 |
 | iter(17/18) | decoder白盒+编码器白盒 | decoder内部28+qrcode内部20+mask选择8+PNG_IDAT6=62个，447→509 |
 | iter(18/18) | mask选择bug修复 | `bestpenalty=1<<31`溢出导致mask恒为0，修复为`0x7FFFFFFF`，509/509通过 |
+| iter(19/19) | 变异对照+彩色QR边界 | 变异对照21（RS纠错5+mask选择3+CRC3+RLE3+交错2+解码3+喷泉码2）+彩色QR边界23（颜色工厂3+双射3+to_rgb4+from_rgb3+编解码4+图片3+错误1+RGB往返1+尺寸1）=44个，509→553，batch.txt重新生成 |
 
-> 截至 2026-11-05，项目已扩展至 509/509 测试，新增彩色QR无损编解码、自研全版本解码器（V1~V40）、前端UI、摄像头扫码、无损传输深度测试（喷泉码丢帧/大文件/容量边界/彩色QR/管线/稳定性/图片格式，66 个闭环测试 = 35 系统 + 31 深度）、无损传输压力测试（44 个，覆盖性能基准 8 / 模糊测试 15 / 版本补全 13 / 乱序丢帧 8 四个维度，文件 `src/qr/lossless_stress_test.mbt`）、薄弱点打磨测试（84 个，覆盖 CLI 辅助 21 + 核心编码器深度 20 + 解码器错误 11 + 协议错误 12 + 策略补全 12 + Web 绑定 8）、核心基础模块单元测试（74 个，覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12，5 个文件：src/qr/gf256_test.mbt、src/qr/bits_test.mbt、src/qr/segment_test.mbt、src/qr/tables_test.mbt、src/qr/image_content_test.mbt）、decoder/编码器白盒测试（62 个，覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6，4 个文件：src/qr/decoder_internals_wbtest.mbt、src/qr/qrcode_internals_wbtest.mbt、src/qr/mask_selection_test.mbt、src/qr/png_data_test.mbt）、mask 选择 bug 修复（bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF），165/165 交叉验证通过，0 warnings。
+> 截至 2026-11-05，项目已扩展至 553/553 测试，新增彩色QR无损编解码、自研全版本解码器（V1~V40）、前端UI、摄像头扫码、无损传输深度测试（喷泉码丢帧/大文件/容量边界/彩色QR/管线/稳定性/图片格式，66 个闭环测试 = 35 系统 + 31 深度）、无损传输压力测试（44 个，覆盖性能基准 8 / 模糊测试 15 / 版本补全 13 / 乱序丢帧 8 四个维度，文件 `src/qr/lossless_stress_test.mbt`）、薄弱点打磨测试（84 个，覆盖 CLI 辅助 21 + 核心编码器深度 20 + 解码器错误 11 + 协议错误 12 + 策略补全 12 + Web 绑定 8）、核心基础模块单元测试（74 个，覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12，5 个文件：src/qr/gf256_test.mbt、src/qr/bits_test.mbt、src/qr/segment_test.mbt、src/qr/tables_test.mbt、src/qr/image_content_test.mbt）、decoder/编码器白盒测试（62 个，覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6，4 个文件：src/qr/decoder_internals_wbtest.mbt、src/qr/qrcode_internals_wbtest.mbt、src/qr/mask_selection_test.mbt、src/qr/png_data_test.mbt）、mask 选择 bug 修复（bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF）、变异对照测试（21 个，覆盖 RS 纠错 5 + mask 选择 3 + CRC 3 + RLE 3 + 交错 2 + 解码 3 + 喷泉码 2，文件 src/qr/variant_contrast_test.mbt）、彩色 QR 边界测试（23 个，覆盖颜色工厂 3 + 双射 3 + to_rgb 4 + from_rgb 3 + 编解码 4 + 图片 3 + 错误 1 + RGB 往返 1 + 尺寸 1，文件 src/qr/color_qr_edge_test.mbt），165/165 交叉验证通过，0 warnings。
 
 **最终验证日期**：2026-11-05  
 **最终验证结果**：
 - `moon fmt`：通过
 - `moon check`：0 errors，0 warnings
-- `moon test --target js`：509/509 通过
+- `moon test --target js`：553/553 通过
 - `moon info`：0 errors
 - 交叉验证（V1~V40 全版本全纠错级全模式）：165/165 OK
 - WASM 构建：60895 字节（≈60KB）
