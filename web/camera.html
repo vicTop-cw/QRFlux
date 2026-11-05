@@ -5,149 +5,164 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QRFlux 摄像头扫码</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
+      max-width: 800px; margin: 0 auto; padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
     }
     .container {
-      display: grid;
-      gap: 20px;
+      background: white; border-radius: 12px; padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
     }
+    h1 { color: #333; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; }
+    .nav a { color: #667eea; text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
     .camera-panel {
-      background: #000;
-      border-radius: 8px;
-      padding: 10px;
+      background: #000; border-radius: 8px; padding: 10px; text-align: center;
     }
-    #camera-feed {
-      width: 100%;
-      border-radius: 4px;
+    #camera-feed, #captured-image {
+      max-width: 100%; border-radius: 4px;
     }
-    #captured-image {
-      width: 100%;
-      border-radius: 4px;
-      display: none;
-    }
+    #captured-image { display: none; }
+    canvas { display: none; }
+    .controls { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
     button {
-      padding: 10px 20px;
-      margin: 5px;
-      cursor: pointer;
-      background: #007acc;
-      color: white;
-      border: none;
-      border-radius: 4px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; border: none; padding: 12px 24px; border-radius: 6px;
+      cursor: pointer; font-size: 14px; font-weight: 600;
     }
-    button:hover {
-      background: #005a9e;
+    button:hover { transform: translateY(-2px); }
+    button.secondary { background: #6c757d; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result {
+      margin-top: 15px; padding: 15px; border-radius: 6px; border-left: 4px solid #4caf50;
+      background: #e8f5e9; word-break: break-all;
     }
-    #result {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f0f0f0;
-      border-radius: 4px;
-      white-space: pre-wrap;
-    }
+    .result.error { background: #ffebee; border-left-color: #f44336; }
+    .result.info { background: #e3f2fd; border-left-color: #2196f3; }
+    .status { margin: 10px 0; padding: 8px; background: #f0f0f0; border-radius: 4px; font-size: 14px; }
     .note {
-      margin-top: 20px;
-      padding: 15px;
-      background: #e3f2fd;
-      border-radius: 4px;
-      border-left: 4px solid #2196f3;
+      margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 6px;
+      border-left: 4px solid #2196f3; font-size: 14px;
     }
   </style>
 </head>
 <body>
-  <h1>QRFlux 摄像头扫码</h1>
-  <p>使用摄像头扫描 QR 码</p>
-  
   <div class="container">
+    <h1>📷 QRFlux 摄像头扫码</h1>
+    <div class="nav">
+      <a href="/">编解码</a>
+      <a href="/camera">摄像头扫码</a>
+    </div>
+
     <div class="camera-panel">
       <video id="camera-feed" autoplay playsinline></video>
-      <canvas id="capture-canvas" style="display: none;"></canvas>
-      <img id="captured-image" alt="Captured image">
+      <img id="captured-image" alt="Captured">
     </div>
-    
-    <div>
+    <canvas id="capture-canvas"></canvas>
+
+    <div class="controls">
       <button onclick="startCamera()">启动摄像头</button>
-      <button onclick="captureImage()">捕获图像</button>
-      <button onclick="stopCamera()">停止摄像头</button>
+      <button onclick="captureAndDecode()" id="capture-btn" disabled>捕获并解码</button>
+      <button onclick="stopCamera()" class="secondary">停止摄像头</button>
     </div>
-    
+
+    <div id="status" class="status">摄像头未启动</div>
     <div id="result"></div>
-    
+
     <div class="note">
       <strong>💡 说明：</strong>
-      <p style="margin: 10px 0 0 0;">
-        完整的 QR 解码需要额外的解码库（如 zxing-wasm 或 jsQR）。
-        当前实现提供摄像头捕获功能，QR 解码需要集成外部库。
-      </p>
+      <p>使用浏览器摄像头捕获 QR 码图像，通过 jsQR 库解码。</p>
+      <p>支持后置摄像头（移动设备）和前置摄像头。</p>
     </div>
   </div>
-  
+
+  <!-- jsQR library for QR decoding -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.2/dist/jsQR.js"></script>
   <script>
     let videoStream = null;
-    
+    let scanning = false;
+
+    function setStatus(text) {
+      document.getElementById('status').textContent = text;
+    }
+
+    function showResult(text, type) {
+      const div = document.getElementById('result');
+      div.innerHTML = `<div class="result ${type || ''}">${text}</div>`;
+    }
+
     async function startCamera() {
-      const resultDiv = document.getElementById('result');
-      const video = document.getElementById('camera-feed');
-      
       try {
         const constraints = {
           video: {
-            facingMode: 'environment',  // 后置摄像头
+            facingMode: 'environment',
             width: { ideal: 1280 },
             height: { ideal: 720 }
           }
         };
-        
         videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = videoStream;
-        
-        resultDiv.innerHTML = '<div class="success">摄像头已启动</div>';
+        document.getElementById('camera-feed').srcObject = videoStream;
+        document.getElementById('capture-btn').disabled = false;
+        setStatus('✅ 摄像头已启动');
+        showResult('摄像头已启动，点击"捕获并解码"扫描 QR 码', 'info');
       } catch (e) {
-        resultDiv.innerHTML = '<div class="error">摄像头启动失败: ' + e.message + '</div>';
+        setStatus('❌ 摄像头启动失败: ' + e.message);
+        showResult('摄像头启动失败: ' + e.message, 'error');
       }
     }
-    
-    function captureImage() {
+
+    function captureAndDecode() {
+      if (!videoStream) { showResult('请先启动摄像头', 'error'); return; }
       const video = document.getElementById('camera-feed');
       const canvas = document.getElementById('capture-canvas');
-      const img = document.getElementById('captured-image');
-      const resultDiv = document.getElementById('result');
-      
-      if (!videoStream) {
-        resultDiv.innerHTML = '<div class="error">请先启动摄像头</div>';
-        return;
-      }
-      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
-      
-      // Convert to image
-      img.src = canvas.toDataURL('image/png');
-      img.style.display = 'block';
-      
-      resultDiv.innerHTML = '<div class="success">图像已捕获</div>';
+
+      // Try to decode from canvas
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'attemptBoth'
+      });
+
+      if (code) {
+        showResult(`✅ QR 码解码成功！<br><br><strong>数据:</strong> ${code.data}<br><br><strong>位置:</strong> (${code.location.topLeftCorner.x.toFixed(0)}, ${code.location.topLeftCorner.y.toFixed(0)})`, '');
+        setStatus('✅ 解码成功');
+        // Show captured image
+        const img = document.getElementById('captured-image');
+        img.src = canvas.toDataURL('image/png');
+        img.style.display = 'block';
+      } else {
+        showResult('❌ 未检测到 QR 码，请调整角度和距离后重试', 'error');
+        setStatus('❌ 未检测到 QR 码');
+      }
     }
-    
+
     function stopCamera() {
-      const video = document.getElementById('camera-feed');
-      
       if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
-        video.srcObject = null;
+        document.getElementById('camera-feed').srcObject = null;
+        document.getElementById('capture-btn').disabled = true;
+        setStatus('摄像头已停止');
       }
-      
-      document.getElementById('result').innerHTML = '<div class="success">摄像头已停止</div>';
     }
-    
-    // Note: Full QR decoding requires external library
-    // Options: zxing-wasm, jsQR, or similar
+
+    // Auto-scan mode: continuously scan every 500ms
+    function startAutoScan() {
+      scanning = true;
+      const scan = () => {
+        if (!scanning || !videoStream) return;
+        captureAndDecode();
+        if (scanning) setTimeout(scan, 500);
+      };
+      scan();
+    }
   </script>
 </body>
 </html>

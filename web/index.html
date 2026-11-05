@@ -3,289 +3,212 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QRFlux 二维码演示</title>
+  <title>QRFlux 二维码编解码</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 20px;
+      max-width: 900px; margin: 0 auto; padding: 20px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
     }
     .container {
-      background: white;
-      border-radius: 12px;
-      padding: 30px;
+      background: white; border-radius: 12px; padding: 30px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.2);
     }
-    h1 {
-      color: #333;
-      margin-bottom: 10px;
-      font-size: 2em;
-    }
-    .subtitle {
-      color: #666;
-      margin-bottom: 30px;
-    }
+    h1 { color: #333; margin-bottom: 10px; }
+    .subtitle { color: #666; margin-bottom: 30px; }
     .demo-section {
-      margin-bottom: 30px;
-      padding: 20px;
-      background: #f8f9fa;
-      border-radius: 8px;
+      margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;
     }
-    h2 {
-      color: #444;
-      margin-top: 0;
+    h2 { color: #444; margin-top: 0; }
+    textarea, input[type="text"] {
+      width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px;
+      font-size: 14px; transition: border-color 0.3s;
     }
-    textarea {
-      width: 100%;
-      min-height: 80px;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 6px;
-      font-size: 14px;
-      resize: vertical;
-      transition: border-color 0.3s;
-    }
-    textarea:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-    .controls {
-      display: flex;
-      gap: 15px;
-      margin-top: 15px;
-      flex-wrap: wrap;
-    }
+    textarea:focus, input[type="text"]:focus { outline: none; border-color: #667eea; }
+    textarea { min-height: 80px; resize: vertical; }
+    .controls { display: flex; gap: 15px; margin-top: 15px; flex-wrap: wrap; align-items: center; }
     select, input[type="number"] {
-      padding: 10px;
-      border: 2px solid #e0e0e0;
-      border-radius: 6px;
-      font-size: 14px;
+      padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 14px;
     }
     button {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
+      color: white; border: none; padding: 12px 24px; border-radius: 6px;
+      cursor: pointer; font-size: 14px; font-weight: 600;
       transition: transform 0.2s, box-shadow 0.2s;
     }
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    button:active {
-      transform: translateY(0);
-    }
-    #qr-canvas {
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      margin-top: 20px;
-      display: block;
-      max-width: 100%;
-      height: auto;
-    }
+    button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+    button:active { transform: translateY(0); }
+    button.secondary { background: #6c757d; }
     .result {
-      margin-top: 20px;
-      padding: 15px;
-      background: #e8f5e9;
-      border-radius: 6px;
-      border-left: 4px solid #4caf50;
+      margin-top: 15px; padding: 15px; border-radius: 6px; border-left: 4px solid #4caf50;
+      background: #e8f5e9; word-break: break-all; font-family: monospace; font-size: 13px;
     }
-    .result.error {
-      background: #ffebee;
-      border-left-color: #f44336;
+    .result.error { background: #ffebee; border-left-color: #f44336; }
+    .result.info { background: #e3f2fd; border-left-color: #2196f3; }
+    .hex-display {
+      margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px;
+      font-family: monospace; font-size: 12px; max-height: 100px; overflow-y: auto;
+      word-break: break-all;
     }
-    .qr-info {
-      margin-top: 15px;
-      padding: 10px;
-      background: #fff3cd;
-      border-radius: 6px;
-      font-family: monospace;
-      font-size: 12px;
-    }
-    .note {
-      margin-top: 20px;
-      padding: 15px;
-      background: #e3f2fd;
-      border-radius: 6px;
-      border-left: 4px solid #2196f3;
-      font-size: 14px;
-    }
-    .note a {
-      color: #1976d2;
-      text-decoration: none;
-    }
-    .note a:hover {
-      text-decoration: underline;
-    }
+    canvas { border: 2px solid #e0e0e0; border-radius: 8px; margin-top: 15px; display: block; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; }
+    .nav a { color: #667eea; text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🔲 QRFlux 二维码演示</h1>
+    <h1>🔲 QRFlux 二维码编解码</h1>
     <p class="subtitle">纯 MoonBit 实现的二维码无损文件传输</p>
-    
-    <div class="demo-section">
-      <h2>单帧 QR 编码</h2>
-      <textarea id="input-data" placeholder="输入要编码的文本...">Hello QRFlux!</textarea>
-      
-      <div class="controls">
-        <select id="qr-version">
-          <option value="1">版本 1 (21×21)</option>
-          <option value="2">版本 2 (25×25)</option>
-          <option value="3">版本 3 (29×29)</option>
-          <option value="5">版本 5 (37×37)</option>
-          <option value="10">版本 10 (57×57)</option>
-        </select>
-        
-        <select id="qr-ecl">
-          <option value="L">纠错 L (7%)</option>
-          <option value="M" selected>纠错 M (15%)</option>
-          <option value="Q">纠错 Q (25%)</option>
-          <option value="H">纠错 H (30%)</option>
-        </select>
-        
-        <button onclick="generateQR()">生成 QR 码</button>
-        <button onclick="clearCanvas()">清除</button>
-      </div>
-      
-      <div id="qr-info" class="qr-info" style="display: none;"></div>
-      <canvas id="qr-canvas"></canvas>
-      <div id="result"></div>
+    <div class="nav">
+      <a href="/">编解码</a>
+      <a href="/camera">摄像头扫码</a>
     </div>
-    
+
+    <!-- 静态编码 -->
     <div class="demo-section">
-      <h2>📊 动态码流（多帧）</h2>
-      <p style="color: #666; margin-bottom: 15px;">支持 >1KB 文件分片为多帧 QR 码，使用 LT 喷泉码实现丢包恢复。</p>
-      
-      <textarea id="stream-data" placeholder="输入要分片编码的文本..."></textarea>
-      
+      <h2>📝 静态编码</h2>
+      <textarea id="encode-input" placeholder="输入要编码的文本...">Hello QRFlux!</textarea>
       <div class="controls">
-        <label>每帧负载：</label>
-        <input type="number" id="frame-payload" value="50" min="10" max="200">
-        <span style="color: #666; font-size: 14px; align-self: center;">字节</span>
-        
-        <button onclick="encodeStream()">分片编码</button>
-      </div>
-      
-      <div id="stream-result"></div>
-    </div>
-    
-    <div class="demo-section">
-      <h2>📏 容量查询</h2>
-      <div class="controls">
-        <select id="cap-version">
-          <option value="1">版本 1</option>
-          <option value="5">版本 5</option>
-          <option value="10">版本 10</option>
-          <option value="20">版本 20</option>
-          <option value="40">版本 40</option>
+        <select id="encode-ecl">
+          <option value="L">纠错 L</option>
+          <option value="M" selected>纠错 M</option>
+          <option value="Q">纠错 Q</option>
+          <option value="H">纠错 H</option>
         </select>
-        
-        <select id="cap-ecl">
+        <button onclick="encodeStatic()">编码</button>
+      </div>
+      <div id="encode-result"></div>
+      <div id="encode-hex" class="hex-display" style="display:none;"></div>
+    </div>
+
+    <!-- 静态解码 -->
+    <div class="demo-section">
+      <h2>🔓 静态解码</h2>
+      <textarea id="decode-input" placeholder="粘贴 hex 数据..."></textarea>
+      <div class="controls">
+        <button onclick="decodeStatic()">解码</button>
+        <button class="secondary" onclick="document.getElementById('decode-input').value=document.getElementById('encode-hex').textContent">从编码结果填入</button>
+      </div>
+      <div id="decode-result"></div>
+    </div>
+
+    <!-- 动态编码 -->
+    <div class="demo-section">
+      <h2>📊 动态码流编码</h2>
+      <p style="color:#666;font-size:14px;">支持 >1KB 数据分片为多帧 QR 码</p>
+      <textarea id="dyn-encode-input" placeholder="输入要分片编码的文本..."></textarea>
+      <div class="controls">
+        <label>每帧负载:</label>
+        <input type="number" id="frame-size" value="50" min="10" max="500" style="width:80px;">
+        <select id="dyn-encode-ecl">
           <option value="L">L</option>
-          <option value="M">M</option>
+          <option value="M" selected>M</option>
           <option value="Q">Q</option>
           <option value="H">H</option>
         </select>
-        
-        <button onclick="queryCapacity()">查询容量</button>
+        <button onclick="encodeDynamic()">分片编码</button>
       </div>
-      <div id="capacity-result"></div>
+      <div id="dyn-encode-result"></div>
+      <div id="dyn-encode-hex" class="hex-display" style="display:none;"></div>
     </div>
-    
-    <div class="note">
-      <strong>💡 说明：</strong>
-      <p style="margin: 10px 0 0 0;">
-        此演示页面展示 QRFlux 的 QR 编码功能。完整的 WASM 集成需要额外的配置。
-        当前请使用命令行工具进行测试：
-      </p>
-      <pre style="margin: 10px 0 0 0; padding: 10px; background: #f5f5f5; border-radius: 4px; overflow-x: auto;">
-# 运行测试
-moon test --target js
 
-# 生成 QR 码矩阵
-moon run cmd/main > batch.txt
-
-# 交叉验证
-python scripts/verify_qr.py batch.txt</pre>
+    <!-- 动态解码 -->
+    <div class="demo-section">
+      <h2>📦 动态码流解码</h2>
+      <textarea id="dyn-decode-input" placeholder="粘贴多帧 hex (分号分隔)..."></textarea>
+      <div class="controls">
+        <button onclick="decodeDynamic()">解码</button>
+        <button class="secondary" onclick="document.getElementById('dyn-decode-input').value=document.getElementById('dyn-encode-hex').textContent">从编码结果填入</button>
+      </div>
+      <div id="dyn-decode-result"></div>
     </div>
   </div>
-  
+
   <script>
-    // 注意：实际 WASM 集成需要额外的配置
-    // 此页面作为演示界面，实际功能需要通过命令行测试
-    
-    function generateQR() {
-      const data = document.getElementById('input-data').value;
-      const version = document.getElementById('qr-version').value;
-      const ecl = document.getElementById('qr-ecl').value;
-      const resultDiv = document.getElementById('result');
-      const infoDiv = document.getElementById('qr-info');
-      
-      if (!data) {
-        resultDiv.innerHTML = '<div class="result error">请输入数据</div>';
-        return;
-      }
-      
-      resultDiv.innerHTML = '<div class="result">QR 编码功能需要通过命令行测试。请运行：<br><code>moon test --target js</code></div>';
-      infoDiv.style.display = 'none';
+    async function api(url, data) {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return resp.json();
     }
-    
-    function encodeStream() {
-      const data = document.getElementById('stream-data').value;
-      const maxPayload = document.getElementById('frame-payload').value;
-      const resultDiv = document.getElementById('stream-result');
-      
-      if (!data) {
-        resultDiv.innerHTML = '<div class="result error">请输入数据</div>';
-        return;
-      }
-      
-      resultDiv.innerHTML = '<div class="result">动态码流功能已通过测试。请查看测试结果：<br><code>moon test --target js</code></div>';
+
+    function showResult(id, text, type) {
+      const div = document.getElementById(id);
+      div.innerHTML = `<div class="result ${type || ''}">${text}</div>`;
     }
-    
-    function queryCapacity() {
-      const version = document.getElementById('cap-version').value;
-      const ecl = document.getElementById('cap-ecl').value;
-      const resultDiv = document.getElementById('capacity-result');
-      
-      // QR 容量参考表（字节）
-      const capacities = {
-        'L': { 1: 152, 5: 136, 10: 504, 20: 1388, 40: 2953 },
-        'M': { 1: 128, 5: 112, 10: 400, 20: 1092, 40: 2331 },
-        'Q': { 1: 104, 5: 88, 10: 308, 20: 828, 40: 1663 },
-        'H': { 1: 72, 5: 64, 10: 224, 20: 604, 40: 1273 }
-      };
-      
-      const capacity = capacities[ecl][version];
-      resultDiv.innerHTML = `<div class="result">
-        版本 ${version} (ECL: ${ecl}) 容量: <strong>${capacity}</strong> 字节
-      </div>`;
+
+    async function encodeStatic() {
+      const text = document.getElementById('encode-input').value;
+      const ecl = document.getElementById('encode-ecl').value;
+      if (!text) { showResult('encode-result', '请输入数据', 'error'); return; }
+      showResult('encode-result', '编码中...', 'info');
+      try {
+        const r = await api('/api/encode-static', { text, ecl });
+        if (r.success) {
+          showResult('encode-result', `✅ 编码成功 (hex 长度: ${r.hex.length})`);
+          const hexDiv = document.getElementById('encode-hex');
+          hexDiv.textContent = r.hex;
+          hexDiv.style.display = 'block';
+        } else {
+          showResult('encode-result', '❌ 编码失败: ' + (r.output || '未知错误'), 'error');
+        }
+      } catch (e) { showResult('encode-result', '❌ 请求失败: ' + e.message, 'error'); }
     }
-    
-    function clearCanvas() {
-      const canvas = document.getElementById('qr-canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      document.getElementById('result').innerHTML = '';
-      document.getElementById('qr-info').style.display = 'none';
+
+    async function decodeStatic() {
+      const hex = document.getElementById('decode-input').value.trim();
+      if (!hex) { showResult('decode-result', '请输入 hex 数据', 'error'); return; }
+      showResult('decode-result', '解码中...', 'info');
+      try {
+        const r = await api('/api/decode-static', { hex });
+        if (r.success) {
+          const lines = r.output.split('\n').filter(l => !l.startsWith('#'));
+          showResult('decode-result', `✅ 解码结果: <strong>${lines.join('\n')}</strong>`);
+        } else {
+          showResult('decode-result', '❌ 解码失败', 'error');
+        }
+      } catch (e) { showResult('decode-result', '❌ 请求失败: ' + e.message, 'error'); }
     }
-    
-    // 初始化
-    document.addEventListener('DOMContentLoaded', function() {
-      // 设置默认容量查询
-      queryCapacity();
-    });
+
+    async function encodeDynamic() {
+      const text = document.getElementById('dyn-encode-input').value;
+      const frame_size = parseInt(document.getElementById('frame-size').value);
+      const ecl = document.getElementById('dyn-encode-ecl').value;
+      if (!text) { showResult('dyn-encode-result', '请输入数据', 'error'); return; }
+      showResult('dyn-encode-result', '编码中...', 'info');
+      try {
+        const r = await api('/api/encode-dynamic', { text, frame_size, ecl });
+        if (r.success) {
+          const frames = r.hex.split(';').length;
+          showResult('dyn-encode-result', `✅ 编码成功 (${frames} 帧, hex 长度: ${r.hex.length})`);
+          const hexDiv = document.getElementById('dyn-encode-hex');
+          hexDiv.textContent = r.hex;
+          hexDiv.style.display = 'block';
+        } else {
+          showResult('dyn-encode-result', '❌ 编码失败: ' + (r.output || '未知错误'), 'error');
+        }
+      } catch (e) { showResult('dyn-encode-result', '❌ 请求失败: ' + e.message, 'error'); }
+    }
+
+    async function decodeDynamic() {
+      const hex = document.getElementById('dyn-decode-input').value.trim();
+      if (!hex) { showResult('dyn-decode-result', '请输入 hex 数据', 'error'); return; }
+      showResult('dyn-decode-result', '解码中...', 'info');
+      try {
+        const r = await api('/api/decode-dynamic', { hex });
+        if (r.success) {
+          const lines = r.output.split('\n').filter(l => !l.startsWith('#'));
+          showResult('dyn-decode-result', `✅ 解码结果: <strong>${lines.join('\n')}</strong>`);
+        } else {
+          showResult('dyn-decode-result', '❌ 解码失败', 'error');
+        }
+      } catch (e) { showResult('dyn-decode-result', '❌ 请求失败: ' + e.message, 'error'); }
+    }
   </script>
 </body>
 </html>
