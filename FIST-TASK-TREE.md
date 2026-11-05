@@ -217,6 +217,10 @@ T0 (Root) - QRFlux 完整项目
 | iter(12/14) | 最终验证 | 66/66 单元测试通过，8/8 交叉验证通过 |
 | iter(13/14) | 无损传输深度测试 | 66 个闭环测试（35 系统 + 31 深度），245 测试基线 |
 | iter(14/14) | 无损传输压力测试 | 新增 44 个压力测试（性能基准 8 / 模糊测试 15 / 版本补全 13 / 乱序丢帧 8），245→289，文件 `src/qr/lossless_stress_test.mbt` |
+| iter(15/18) | 薄弱点打磨 | CLI辅助21+编码器深度20+解码器错误11+协议错误12+策略补全12+Web绑定8=84个，289→373 |
+| iter(16/18) | 核心基础模块 | gf256域运算18+bits位流15+segment分段15+tables常量表14+图片内容12=74个，373→447 |
+| iter(17/18) | decoder白盒+编码器白盒 | decoder内部28+qrcode内部20+mask选择8+PNG_IDAT6=62个，447→509 |
+| iter(18/18) | mask选择bug修复 | `bestpenalty=1<<31`溢出导致mask恒为0，修复为`0x7FFFFFFF`，509/509通过 |
 | iter(15/15) | 薄弱点打磨 | 新增 84 个测试（CLI 辅助 21 + 核心编码器深度 20 + 解码器错误 11 + 协议错误 12 + 策略补全 12 + Web 绑定 8），289→373，6 个文件：cmd/main/main_wbtest.mbt、src/qr/qrcode_deep_test.mbt、src/qr/decoder_error_test.mbt、src/qr/protocol_error_test.mbt、src/qr/strategy_extra_test.mbt、src/web/web_test.mbt |
 | iter(16/16) | 核心基础模块单元测试 | 新增 74 个测试（GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12），373→447，5 个文件：src/qr/gf256_test.mbt、src/qr/bits_test.mbt、src/qr/segment_test.mbt、src/qr/tables_test.mbt、src/qr/image_content_test.mbt |
 

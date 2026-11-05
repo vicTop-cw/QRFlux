@@ -193,7 +193,7 @@ fn build_qr(
 
   // Choose best mask (0..7), draw format bits after masking.
   let mut bestmask = 0
-  let mut bestpenalty = 1 << 31
+  let mut bestpenalty = 0x7FFFFFFF
   for mask = 0; mask < 8; mask = mask + 1 {
     apply_mask(size, mask, modules, isfunction)
     draw_format_bits(size, level, mask, modules, isfunction)
