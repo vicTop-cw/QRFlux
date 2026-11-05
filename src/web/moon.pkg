@@ -1,0 +1,7 @@
+// Web package: WASM/JS bindings for QRFlux.
+// Exposes static and dynamic QR encoding/decoding to JavaScript.
+import {
+  "vicTop-cw/QRFlux/src/qr",
+}
+
+pkgtype(kind: "library")

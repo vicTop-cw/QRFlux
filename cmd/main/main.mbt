@@ -294,6 +294,137 @@ fn base64_encode(data : FixedArray[Int32]) -> String {
 }
 
 ///|
+/// Parse a hex character to its numeric value (0~15). Returns -1 if invalid.
+fn hex_val(c : Int32) -> Int32 {
+  if c >= 0x30 && c <= 0x39 {
+    c - 0x30
+  } else if c >= 0x41 && c <= 0x46 {
+    c - 0x41 + 10
+  } else if c >= 0x61 && c <= 0x66 {
+    c - 0x61 + 10
+  } else {
+    -1
+  }
+}
+
+///|
+/// Parse a hex string to a byte array. Returns None on invalid input or odd length.
+fn hex_to_bytes(hex : String) -> FixedArray[Int32]? {
+  let chars = hex.to_array()
+  let n = chars.length()
+  if n == 0 || n % 2 != 0 {
+    return None
+  }
+  let data = FixedArray::make(n / 2, 0)
+  for i = 0; i < n / 2; i = i + 1 {
+    let hi = hex_val(chars[i * 2].to_int())
+    let lo = hex_val(chars[i * 2 + 1].to_int())
+    if hi < 0 || lo < 0 {
+      return None
+    }
+    data[i] = hi * 16 + lo
+  }
+  Some(data)
+}
+
+///|
+/// Convert a byte array to a UTF-8 string for display.
+/// If all bytes are printable ASCII, output directly; otherwise output hex.
+fn bytes_to_display(bytes : FixedArray[Int32]) -> String {
+  let mut all_printable = true
+  for i = 0; i < bytes.length(); i = i + 1 {
+    let b = bytes[i]
+    if b < 0x20 || b > 0x7e {
+      all_printable = false
+      break
+    }
+  }
+  if all_printable {
+    let mut s = ""
+    for i = 0; i < bytes.length(); i = i + 1 {
+      s = s + bytes[i].unsafe_to_char().to_string()
+    }
+    s
+  } else {
+    let mut s = ""
+    for i = 0; i < bytes.length(); i = i + 1 {
+      s = s + hex2(bytes[i])
+    }
+    s
+  }
+}
+
+///|
+/// Run static decode: hex (packaged bytes) -> decode_static -> original data.
+fn run_decode_static(hex : String) -> Unit {
+  match hex_to_bytes(hex) {
+    None => println("Error: invalid hex string")
+    Some(bytes) =>
+      match @qr.decode_static(bytes) {
+        None =>
+          println(
+            "Error: decode_static failed (invalid package or unknown algo)",
+          )
+        Some(data) => {
+          println("# decoded: " + data.length().to_string() + " bytes")
+          println(bytes_to_display(data))
+        }
+      }
+  }
+}
+
+///|
+/// Run dynamic decode: hex frames (semicolon-separated) -> reassemble -> data.
+fn run_decode_dynamic(hex : String) -> Unit {
+  let frames : Array[FixedArray[Int32]] = []
+  let chars = hex.to_array()
+  let mut start = 0
+  let mut i = 0
+  while i <= chars.length() {
+    if i == chars.length() || chars[i].to_int() == 0x3b {
+      // ';'
+      if i > start {
+        let mut segment = ""
+        for j = start; j < i; j = j + 1 {
+          segment = segment + chars[j].to_string()
+        }
+        match hex_to_bytes(segment) {
+          Some(bytes) => frames.push(bytes)
+          None => {
+            println(
+              "Error: invalid hex in frame " + frames.length().to_string(),
+            )
+            return
+          }
+        }
+      }
+      start = i + 1
+    }
+    i = i + 1
+  }
+  if frames.length() == 0 {
+    println("Error: no frames provided")
+    return
+  }
+  match @qr.reassemble_frames(frames) {
+    None =>
+      println(
+        "Error: reassemble_frames failed (missing/duplicate frames or checksum mismatch)",
+      )
+    Some(data) => {
+      println(
+        "# decoded: " +
+        data.length().to_string() +
+        " bytes, " +
+        frames.length().to_string() +
+        " frames",
+      )
+      println(bytes_to_display(data))
+    }
+  }
+}
+
+///|
 /// Emit QR image in the requested format to stdout.
 /// pbm/svg: text output directly. png: base64-encoded binary to stdout.
 fn emit_image(qr : @qr.QrCode, format : String) -> Unit {
@@ -316,9 +447,11 @@ fn print_usage() -> Unit {
   println("")
   println("  moon run cmd/main -- --text \"Hello\" --ecl M --format pbm")
   println("    Generate a single QR image. Options:")
-  println("      --text <string>      text to encode (UTF-8, required)")
+  println(
+    "      --text <string>      text to encode (UTF-8, required for encode)",
+  )
   println("      --ecl <L|M|Q|H>      error correction level (default M)")
-  println("      --format <pbm|svg|png>  image format (default pbm)")
+  println("      --format <pbm|svg|png|hex>  output format (default pbm)")
   println(
     "      --output <file>      output file (not supported, writes to stdout)",
   )
@@ -333,11 +466,22 @@ fn print_usage() -> Unit {
     "      --frame-size <n>     per-frame payload bytes (default 500, dynamic)",
   )
   println("")
+  println("  moon run cmd/main -- --decode-static --hex <hex_string>")
+  println("    Decode static pipeline data from packaged bytes (hex).")
+  println("")
+  println("  moon run cmd/main -- --decode-dynamic --hex <hex1;hex2;...>")
+  println(
+    "    Decode dynamic stream data from frame bytes (hex, semicolon-separated).",
+  )
+  println("")
   println("Formats:")
   println("  pbm  - Portable Bitmap ASCII (P1), text output")
   println("  svg  - SVG vector image, text output")
   println(
     "  png  - PNG binary, output as base64 (decode: | base64 -d > out.png)",
+  )
+  println(
+    "  hex  - Packaged/frame bytes as hex (for --decode-static/--decode-dynamic)",
   )
 }
 
@@ -390,6 +534,7 @@ fn run_dynamic(
   ecl : String,
   frame_size : Int32,
   label : String,
+  format : String,
 ) -> Unit {
   // Guard: frame_size must be positive; clamp to a safe lower bound.
   let fs = if frame_size < 1 { 1 } else { frame_size }
@@ -416,6 +561,20 @@ fn run_dynamic(
     " ecl=" +
     ecl,
   )
+  if format == "hex" {
+    // Output frame bytes as hex, semicolon-separated (for --decode-dynamic).
+    let mut hex = ""
+    for i = 0; i < total; i = i + 1 {
+      if i > 0 {
+        hex = hex + ";"
+      }
+      for j = 0; j < frames[i].length(); j = j + 1 {
+        hex = hex + hex2(frames[i][j])
+      }
+    }
+    println(hex)
+    return
+  }
   for i = 0; i < total; i = i + 1 {
     emit_dynamic_case(label, frames[i], i, total, ecl)
   }
@@ -430,6 +589,9 @@ fn run_cli(args : Array[String]) -> Unit {
   let mut format : String = "pbm"
   let mut use_static : Bool = false
   let mut use_dynamic : Bool = false
+  let mut use_decode_static : Bool = false
+  let mut use_decode_dynamic : Bool = false
+  let mut hex_data : String = ""
   let mut frame_size : Int32 = 500
   let mut i = 1
   while i < args.length() {
@@ -454,6 +616,15 @@ fn run_cli(args : Array[String]) -> Unit {
       use_static = true
     } else if a == "--encode-dynamic" {
       use_dynamic = true
+    } else if a == "--decode-static" {
+      use_decode_static = true
+    } else if a == "--decode-dynamic" {
+      use_decode_dynamic = true
+    } else if a == "--hex" {
+      i = i + 1
+      if i < args.length() {
+        hex_data = args[i]
+      }
     } else if a == "--frame-size" {
       i = i + 1
       if i < args.length() {
@@ -470,6 +641,23 @@ fn run_cli(args : Array[String]) -> Unit {
     }
     i = i + 1
   }
+  // Decode modes (don't require --text, use --hex instead)
+  if use_decode_static {
+    if hex_data == "" {
+      println("Error: --hex is required for --decode-static")
+      return
+    }
+    run_decode_static(hex_data)
+    return
+  }
+  if use_decode_dynamic {
+    if hex_data == "" {
+      println("Error: --hex is required for --decode-dynamic")
+      return
+    }
+    run_decode_dynamic(hex_data)
+    return
+  }
   if !has_text {
     println("Error: --text is required")
     println("")
@@ -481,7 +669,7 @@ fn run_cli(args : Array[String]) -> Unit {
   if use_dynamic {
     // Dynamic stream pipeline: split into frames, one QR per frame.
     // Emit DYNAMIC_CASE blocks (matrix + frame hex) to stdout.
-    run_dynamic(data, ecl, frame_size, "cli")
+    run_dynamic(data, ecl, frame_size, "cli", format)
     return
   }
   if use_static {
@@ -509,7 +697,16 @@ fn run_cli(args : Array[String]) -> Unit {
           " pkg_len=" +
           r.packaged_size().to_string(),
         )
-        emit_image(qr, format)
+        if format == "hex" {
+          let pb = r.packaged_bytes()
+          let mut hex = ""
+          for j = 0; j < pb.length(); j = j + 1 {
+            hex = hex + hex2(pb[j])
+          }
+          println(hex)
+        } else {
+          emit_image(qr, format)
+        }
       }
     }
   } else {
