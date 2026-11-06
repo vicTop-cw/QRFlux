@@ -3,9 +3,9 @@
 纯 MoonBit 实现的二维码无损文件传输项目。
 压缩选档 -> 二进制分片 -> 动态 QR 码流 -> 扫描重组 -> 无损还原。
 
-## 当前状态 (2026-11-06)
+## 当前状态 (2026-11-07)
 
-### 已完成：33 轮迭代全部通过，项目可发布
+### 已完成：34 轮迭代全部通过，项目可发布
 
 - `src/qr/` 编码器核心：字节模式编码、版本/纠错级选择、GF(256) 域运算、Reed-Solomon ECC、功能图案绘制（finder/timing/alignment/format/version）、掩码选择与惩罚评分。
 - 自研 QR 解码器：V1~V40 全版本、L/M/Q/H 四档纠错、全模式无损还原。
@@ -37,13 +37,13 @@
 - [x] 彩色 QR 无损编解码（4色，2bits/module，RGB 识别）——已完成
 - [x] 前端编解码 UI + 摄像头扫码——已完成
 
-## 验证结果 (iter 33/33 最终验证)
+## 验证结果 (iter 34/34 最终验证)
 
 - `moon fmt` / `moon check`：通过（0 errors，0 warnings）
-- `moon test --target js`：**1150/1150 通过**（含 110 个无损传输测试 + 84 个薄弱点打磨 + 74 个核心基础模块单元测试覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12 + 62 个白盒测试覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6 + 44 个变异对照与彩色 QR 边界测试覆盖变异对照 21（RS 纠错 5 + mask 选择 3 + CRC 3 + RLE 3 + 交错 2 + 解码 3 + 喷泉码 2）+ 彩色 QR 边界 23（颜色工厂 3 + 双射 3 + to_rgb 4 + from_rgb 3 + 编解码 4 + 图片 3 + 错误 1 + RGB 往返 1 + 尺寸 1）+ iter 20~24 新增 184 个测试覆盖多段编码 12 + 图片参数边界 15 + integrate 补全 10 + 静态管线组合 18 + fountain 补全 15 + 解码器模式白盒 20 + ECC 纠错边界 18 + stream 边界 15 + decoder 鲁棒性 12 + debug_codewords 6 + web 动态绑定 12 + Forney 修复回归 15 + 大版本 ECC 验证 18）（另修复 mask 选择 bug：bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF；修复 RS Forney 算法 bug：`decoder.mbt` 的 `rs_correct` 中 Forney 公式缺少错误位置因子 X_k=α^pos，修复前 error_val=omega_val/lambda_deriv_val（pos≠0 时纠错值全错），修复后 error_val=(x_k*omega_val)/lambda_deriv_val，纠错能力正确 + iter 25~29 新增 81 个测试覆盖薄弱点打磨 71（错误分支 15 + 边界条件 12 + CLI 入口 36 + web demo 8，commit 5145077）+ 集成打磨 10（decoder 复用 V7+ 3 + static 管线 algo_id 一致 4 + frames_needed 一致 3，commit a21097e）+ iter 30 薄弱点打磨第二批 21（内部辅助函数 11 + 模块间集成 10，818→829，commit d934eab）+ iter 31 十二轮薄弱点打磨 227（轮1-4 往返16+模糊18+性能11+协议16=61，轮5-8 RLE21+喷泉19+彩色14+图片16=70，轮9-12 GF256 20+RS纠错17+分段18+CLI参数29=84，829→1056，commits 676caee/e13ba3e/399255c；另 fuzz 修正 V1-L 容量边界 15→17 字节，commit b370978）+ iter 32 薄弱点打磨轮1-4 共 77（format info 边界 19 + mask 惩罚深度 17 + 位流边界 22 + 常量表完整性 19，1056→1133，commit 64de714）+ iter 33 动态码流帧大小边界 17（split_into_frames/reassemble_frames 边界，1133→1150，stream_framesize_test.mbt））
+- `moon test --target js`：**1287/1287 通过**（含 110 个无损传输测试 + 84 个薄弱点打磨 + 74 个核心基础模块单元测试覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12 + 62 个白盒测试覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6 + 44 个变异对照与彩色 QR 边界测试覆盖变异对照 21（RS 纠错 5 + mask 选择 3 + CRC 3 + RLE 3 + 交错 2 + 解码 3 + 喷泉码 2）+ 彩色 QR 边界 23（颜色工厂 3 + 双射 3 + to_rgb 4 + from_rgb 3 + 编解码 4 + 图片 3 + 错误 1 + RGB 往返 1 + 尺寸 1）+ iter 20~24 新增 184 个测试覆盖多段编码 12 + 图片参数边界 15 + integrate 补全 10 + 静态管线组合 18 + fountain 补全 15 + 解码器模式白盒 20 + ECC 纠错边界 18 + stream 边界 15 + decoder 鲁棒性 12 + debug_codewords 6 + web 动态绑定 12 + Forney 修复回归 15 + 大版本 ECC 验证 18）（另修复 mask 选择 bug：bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF；修复 RS Forney 算法 bug：`decoder.mbt` 的 `rs_correct` 中 Forney 公式缺少错误位置因子 X_k=α^pos，修复前 error_val=omega_val/lambda_deriv_val（pos≠0 时纠错值全错），修复后 error_val=(x_k*omega_val)/lambda_deriv_val，纠错能力正确 + iter 25~29 新增 81 个测试覆盖薄弱点打磨 71（错误分支 15 + 边界条件 12 + CLI 入口 36 + web demo 8，commit 5145077）+ 集成打磨 10（decoder 复用 V7+ 3 + static 管线 algo_id 一致 4 + frames_needed 一致 3，commit a21097e）+ iter 30 薄弱点打磨第二批 21（内部辅助函数 11 + 模块间集成 10，818→829，commit d934eab）+ iter 31 十二轮薄弱点打磨 227（轮1-4 往返16+模糊18+性能11+协议16=61，轮5-8 RLE21+喷泉19+彩色14+图片16=70，轮9-12 GF256 20+RS纠错17+分段18+CLI参数29=84，829→1056，commits 676caee/e13ba3e/399255c；另 fuzz 修正 V1-L 容量边界 15→17 字节，commit b370978）+ iter 32 薄弱点打磨轮1-4 共 77（format info 边界 19 + mask 惩罚深度 17 + 位流边界 22 + 常量表完整性 19，1056→1133，commit 64de714）+ iter 33 动态码流帧大小边界 17（split_into_frames/reassemble_frames 边界，1133→1150，stream_framesize_test.mbt）+ iter 34 十二轮薄弱点打磨 231（轮1-4 format/version info 边界 19 + mask 惩罚深度 17 + 位流边界 22 + 常量表完整性 19 = 77，1056→1133，commit 64de714；轮5-8 静态管线 e2e 18 + 帧大小边界 17 + 喷泉码鲁棒性 20 + 彩色 QR 映射 15 = 70，1133→1203，commit 96d5d57；轮9-12 图片格式深度 18 + RS 极限 19 + 功能图案 20 + web 绑定 28 = 84，1203→1287，commit fd64ca1））
 - 交叉验证（V1~V40 全版本全纠错级全模式）：**165/165 OK**
 - WASM 构建：60895 字节（≈60KB）
-- 最终验证日期：2026-11-06
+- 最终验证日期：2026-11-07
 
 ## 验证方法
 
