@@ -7,7 +7,7 @@
 
 **项目名称**：QRFlux (闪码)  
 **项目描述**：纯 MoonBit 二维码无损文件传输  
-**当前状态**：24 轮迭代全部完成，项目处于可发布状态（737/737 单元测试通过，165/165 交叉验证通过，0 warnings，彩色QR+前端UI+摄像头扫码+无损传输深度测试+无损传输压力测试+薄弱点打磨测试+核心基础模块单元测试+decoder/编码器白盒测试+mask选择bug修复+变异对照测试+彩色QR边界测试+多段编码/图片参数/integrate/静态管线组合/fountain补全/解码器模式白盒/ECC纠错边界/stream边界/decoder鲁棒性/debug_codewords/web动态绑定/Forney修复回归/大版本ECC验证全部完成）
+**当前状态**：29 轮迭代全部完成，项目处于可发布状态（818/818 单元测试通过，165/165 交叉验证通过，0 warnings，彩色QR+前端UI+摄像头扫码+无损传输深度测试+无损传输压力测试+薄弱点打磨测试+核心基础模块单元测试+decoder/编码器白盒测试+mask选择bug修复+变异对照测试+彩色QR边界测试+多段编码/图片参数/integrate/静态管线组合/fountain补全/解码器模式白盒/ECC纠错边界/stream边界/decoder鲁棒性/debug_codewords/web动态绑定/Forney修复回归/大版本ECC验证全部完成）
 
 ---
 
@@ -199,7 +199,7 @@ T0 (Root) - QRFlux 完整项目
 
 ---
 
-## 24 轮迭代完成总结
+## 29 轮迭代完成总结
 
 | 迭代 | 内容 | 结果 |
 |------|------|------|
@@ -227,14 +227,19 @@ T0 (Root) - QRFlux 完整项目
 | iter(22/24) | web动态绑定 | 新增1个测试文件12个测试：web_dynamic_test(web_encode_dynamic 8+wasm_calculate_frames 4)，691→703，commit e68519d，至此所有公开函数均有测试覆盖 |
 | iter(23/24) | Forney修复回归 | 修复RS Forney算法bug：decoder.mbt的rs_correct中Forney公式缺少错误位置因子X_k=α^pos，修复前error_val=omega_val/lambda_deriv_val（pos≠0时纠错值全错），修复后error_val=(x_k*omega_val)/lambda_deriv_val，新增forney_regression_wbtest(15白盒)+更新decoder_robustness_test(新增1个双bit翻转测试)，703→719，commit 120f9ea |
 | iter(24/24) | 大版本ECC验证 | 新增big_version_ecc_test(18黑盒)：V15/V20/V30/V40各4个ECC级翻转1~4个data bit严格验证+2个无错误基线(V20 M/V40 H)，V40 H有20个RS块是最复杂交错场景，719→737，commit 62f4c9e |
+| iter(25/29) | 文档数字同步 | 24 轮/737 同步至文档，无代码改动，commit 14bbcc4 |
+| iter(26/29) | 无改动巡检 | 门禁全绿 737/737，无待办 |
+| iter(27/29) | .gitignore 卫生修复 | 忽略 .codeartsdoer/ 索引目录，commit 8c5087d |
+| iter(28/29) | 无改动巡检 | 门禁全绿 737/737，项目进入稳定期 |
+| iter(29/29) | 遗留测试产出提交+文档同步 | 薄弱点打磨 71（737→808，commit 5145077）+ 集成打磨 10（808→818，commit a21097e），818/818 全绿 |
 
-> 截至 2026-11-06，项目已扩展至 737/737 测试，新增彩色QR无损编解码、自研全版本解码器（V1~V40）、前端UI、摄像头扫码、无损传输深度测试（喷泉码丢帧/大文件/容量边界/彩色QR/管线/稳定性/图片格式，66 个闭环测试 = 35 系统 + 31 深度）、无损传输压力测试（44 个，覆盖性能基准 8 / 模糊测试 15 / 版本补全 13 / 乱序丢帧 8 四个维度，文件 `src/qr/lossless_stress_test.mbt`）、薄弱点打磨测试（84 个，覆盖 CLI 辅助 21 + 核心编码器深度 20 + 解码器错误 11 + 协议错误 12 + 策略补全 12 + Web 绑定 8）、核心基础模块单元测试（74 个，覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12，5 个文件：src/qr/gf256_test.mbt、src/qr/bits_test.mbt、src/qr/segment_test.mbt、src/qr/tables_test.mbt、src/qr/image_content_test.mbt）、decoder/编码器白盒测试（62 个，覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6，4 个文件：src/qr/decoder_internals_wbtest.mbt、src/qr/qrcode_internals_wbtest.mbt、src/qr/mask_selection_test.mbt、src/qr/png_data_test.mbt）、mask 选择 bug 修复（bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF）、变异对照测试（21 个，覆盖 RS 纠错 5 + mask 选择 3 + CRC 3 + RLE 3 + 交错 2 + 解码 3 + 喷泉码 2，文件 src/qr/variant_contrast_test.mbt）、彩色 QR 边界测试（23 个，覆盖颜色工厂 3 + 双射 3 + to_rgb 4 + from_rgb 3 + 编解码 4 + 图片 3 + 错误 1 + RGB 往返 1 + 尺寸 1，文件 src/qr/color_qr_edge_test.mbt）、iter 20 多段编码/图片参数/integrate/静态管线组合/fountain 补全测试（70 个，5 个文件：src/qr/multi_segment_test.mbt 12 + src/qr/image_params_test.mbt 15 + src/qr/integrate_extra_test.mbt 10 + src/qr/static_combo_test.mbt 18 + src/qr/fountain_extra_test.mbt 15，commit c833619）、iter 21 解码器模式白盒/ECC 纠错边界/stream 边界/decoder 鲁棒性/debug_codewords 测试（71 个，5 个文件：src/qr/decoder_mode_wbtest.mbt 20 白盒 + src/qr/decoder_ecc_boundary_test.mbt 18 + src/qr/stream_boundary_test.mbt 15 + src/qr/decoder_robustness_test.mbt 12 + src/qr/debug_codewords_test.mbt 6，commit 7481296）、iter 22 web 动态绑定测试（12 个，1 个文件：src/web/web_dynamic_test.mbt，覆盖 web_encode_dynamic 8 + wasm_calculate_frames 4，commit e68519d，至此所有公开函数均有测试覆盖）、iter 23 RS Forney 算法 bug 修复及回归测试（修复 decoder.mbt 的 rs_correct 中 Forney 公式缺少错误位置因子 X_k=α^pos，修复前 error_val=omega_val/lambda_deriv_val 导致 pos≠0 时纠错值全错，修复后 error_val=(x_k*omega_val)/lambda_deriv_val 即正确 Forney 公式 e_k=X_k·Ω(X_k^{-1})/Λ'(X_k^{-1})，新增 src/qr/forney_regression_wbtest.mbt 15 白盒 + 更新 src/qr/decoder_robustness_test.mbt 新增 1 个双 bit 翻转测试，共 16 个，commit 120f9ea）、iter 24 大版本 ECC 验证测试（18 个，1 个文件：src/qr/big_version_ecc_test.mbt，V15/V20/V30/V40 各 4 个 ECC 级翻转 1~4 个 data bit 严格验证 + 2 个无错误基线 V20 M/V40 H，V40 H 有 20 个 RS 块是最复杂交错场景，commit 62f4c9e），165/165 交叉验证通过，0 warnings。
+> 截至 2026-11-06，项目已扩展至 818/818 测试，新增彩色QR无损编解码、自研全版本解码器（V1~V40）、前端UI、摄像头扫码、无损传输深度测试（喷泉码丢帧/大文件/容量边界/彩色QR/管线/稳定性/图片格式，66 个闭环测试 = 35 系统 + 31 深度）、无损传输压力测试（44 个，覆盖性能基准 8 / 模糊测试 15 / 版本补全 13 / 乱序丢帧 8 四个维度，文件 `src/qr/lossless_stress_test.mbt`）、薄弱点打磨测试（84 个，覆盖 CLI 辅助 21 + 核心编码器深度 20 + 解码器错误 11 + 协议错误 12 + 策略补全 12 + Web 绑定 8）、核心基础模块单元测试（74 个，覆盖 GF256 域运算 18 + bits 位流 15 + segment 分段 15 + tables 常量表 14 + 图片内容正确性 12，5 个文件：src/qr/gf256_test.mbt、src/qr/bits_test.mbt、src/qr/segment_test.mbt、src/qr/tables_test.mbt、src/qr/image_content_test.mbt）、decoder/编码器白盒测试（62 个，覆盖 decoder 内部 28 + qrcode 内部 20 + mask 选择 8 + PNG IDAT 数据 6，4 个文件：src/qr/decoder_internals_wbtest.mbt、src/qr/qrcode_internals_wbtest.mbt、src/qr/mask_selection_test.mbt、src/qr/png_data_test.mbt）、mask 选择 bug 修复（bestpenalty=1<<31 溢出导致 mask 恒为 0，修复为 0x7FFFFFFF）、变异对照测试（21 个，覆盖 RS 纠错 5 + mask 选择 3 + CRC 3 + RLE 3 + 交错 2 + 解码 3 + 喷泉码 2，文件 src/qr/variant_contrast_test.mbt）、彩色 QR 边界测试（23 个，覆盖颜色工厂 3 + 双射 3 + to_rgb 4 + from_rgb 3 + 编解码 4 + 图片 3 + 错误 1 + RGB 往返 1 + 尺寸 1，文件 src/qr/color_qr_edge_test.mbt）、iter 20 多段编码/图片参数/integrate/静态管线组合/fountain 补全测试（70 个，5 个文件：src/qr/multi_segment_test.mbt 12 + src/qr/image_params_test.mbt 15 + src/qr/integrate_extra_test.mbt 10 + src/qr/static_combo_test.mbt 18 + src/qr/fountain_extra_test.mbt 15，commit c833619）、iter 21 解码器模式白盒/ECC 纠错边界/stream 边界/decoder 鲁棒性/debug_codewords 测试（71 个，5 个文件：src/qr/decoder_mode_wbtest.mbt 20 白盒 + src/qr/decoder_ecc_boundary_test.mbt 18 + src/qr/stream_boundary_test.mbt 15 + src/qr/decoder_robustness_test.mbt 12 + src/qr/debug_codewords_test.mbt 6，commit 7481296）、iter 22 web 动态绑定测试（12 个，1 个文件：src/web/web_dynamic_test.mbt，覆盖 web_encode_dynamic 8 + wasm_calculate_frames 4，commit e68519d，至此所有公开函数均有测试覆盖）、iter 23 RS Forney 算法 bug 修复及回归测试（修复 decoder.mbt 的 rs_correct 中 Forney 公式缺少错误位置因子 X_k=α^pos，修复前 error_val=omega_val/lambda_deriv_val 导致 pos≠0 时纠错值全错，修复后 error_val=(x_k*omega_val)/lambda_deriv_val 即正确 Forney 公式 e_k=X_k·Ω(X_k^{-1})/Λ'(X_k^{-1})，新增 src/qr/forney_regression_wbtest.mbt 15 白盒 + 更新 src/qr/decoder_robustness_test.mbt 新增 1 个双 bit 翻转测试，共 16 个，commit 120f9ea）、iter 24 大版本 ECC 验证测试（18 个，1 个文件：src/qr/big_version_ecc_test.mbt，V15/V20/V30/V40 各 4 个 ECC 级翻转 1~4 个 data bit 严格验证 + 2 个无错误基线 V20 M/V40 H，V40 H 有 20 个 RS 块是最复杂交错场景，commit 62f4c9e），165/165 交叉验证通过，0 warnings。iter 25 文档数字同步（24 轮/737 同步至文档，无代码改动，commit 14bbcc4）、iter 26 无改动巡检（门禁全绿 737/737）、iter 27 .gitignore 卫生修复（忽略 .codeartsdoer/ 索引目录，commit 8c5087d）、iter 28 无改动巡检（门禁全绿 737/737，项目进入稳定期）、iter 29 遗留测试产出提交（薄弱点打磨 71 个测试：错误分支 15 + 边界条件 12 + CLI 入口 36 + web demo 8，737→808，commit 5145077；集成打磨 10 个测试：decoder 复用 V7+ 3 + static 管线 algo_id 一致 4 + frames_needed 一致 3，808→818，commit a21097e），818/818 全绿。
 
 **最终验证日期**：2026-11-06  
 **最终验证结果**：
 - `moon fmt`：通过
 - `moon check`：0 errors，0 warnings
-- `moon test --target js`：737/737 通过
+- `moon test --target js`：818/818 通过
 - `moon info`：0 errors
 - 交叉验证（V1~V40 全版本全纠错级全模式）：165/165 OK
 - WASM 构建：60895 字节（≈60KB）
