@@ -7,3 +7,4 @@ target
 *.generated.mbti
 dynamic_batch.txt
 e2e_probe/
+.codeartsdoer/
