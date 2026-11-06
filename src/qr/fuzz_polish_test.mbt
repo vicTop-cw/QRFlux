@@ -310,21 +310,24 @@ test "fuzz polish static: all-0x42 x1000 ECC=L highly compressible" {
 }
 
 ///|
-test "fuzz polish boundary: V1-L exact cap len=15 and overflow len=16" {
-  // V1-L 容量 17 codewords = 136 bits；byte mode 开销 4+8=12 bits，
-  // 故 15 字节 (120+12=132<=136) 正好 V1-L，16 字节溢出到 V2。
-  let d15 = fuzz_gen(15, 1010)
-  let qr15 = @qr.encode_binary(d15, @qr.ecc_low(), 1)
-  assert_true(qr15.version() == 1)
-  match @qr.decode_from_qrcode(qr15) {
-    Some(decoded) => assert_true(fuzz_eq(d15, decoded))
+test "fuzz polish boundary: V1-L exact cap and overflow" {
+  // V1-L data codewords = 19；byte mode 开销 4(mode)+8(count)=12 bits；
+  // 最大字节数 = (19*8 - 12)/8 = 17。17 字节正好 V1-L，18 字节溢出到 V2。
+  let cap_cw = @qr.num_data_codewords(1, @qr.ecc_low())
+  let max_bytes = (cap_cw * 8 - 12) / 8
+  assert_true(max_bytes == 17)
+  let d_cap = fuzz_gen(max_bytes, 1010)
+  let qr_cap = @qr.encode_binary(d_cap, @qr.ecc_low(), 1)
+  assert_true(qr_cap.version() == 1)
+  match @qr.decode_from_qrcode(qr_cap) {
+    Some(decoded) => assert_true(fuzz_eq(d_cap, decoded))
     None => assert_true(false)
   }
-  let d16 = fuzz_gen(16, 1011)
-  let qr16 = @qr.encode_binary(d16, @qr.ecc_low(), 1)
-  assert_true(qr16.version() >= 2)
-  match @qr.decode_from_qrcode(qr16) {
-    Some(decoded) => assert_true(fuzz_eq(d16, decoded))
+  let d_over = fuzz_gen(max_bytes + 1, 1011)
+  let qr_over = @qr.encode_binary(d_over, @qr.ecc_low(), 1)
+  assert_true(qr_over.version() >= 2)
+  match @qr.decode_from_qrcode(qr_over) {
+    Some(decoded) => assert_true(fuzz_eq(d_over, decoded))
     None => assert_true(false)
   }
 }
