@@ -476,10 +476,16 @@ fn rs_correct(
           gf_mul(lambda[j], gf_pow(alpha_inv_pos, j - 1))
       }
     }
+    // Forney: e_k = X_k * Omega(X_k^{-1}) / Lambda'(X_k^{-1})
+    // where X_k = alpha^pos is the error location factor.
+    // The previous implementation omitted the X_k factor, causing
+    // incorrect error values for positions where X_k != 1.
     if lambda_deriv_val == 0 {
       return None
     }
-    let error_val = gf_mul(omega_val, gf_inv(lambda_deriv_val))
+    let x_k = gf_pow(2, pos)
+    let numerator = gf_mul(x_k, omega_val)
+    let error_val = gf_mul(numerator, gf_inv(lambda_deriv_val))
     // Chien search finds i where Lambda(alpha^(-i)) == 0; with the encoder's
     // descending-power codeword layout c(x)=c[0]*x^(n-1)+...+c[n-1], this
     // root corresponds to error at codeword[n-1-i], not codeword[i].

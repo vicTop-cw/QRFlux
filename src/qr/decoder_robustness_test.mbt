@@ -1,10 +1,11 @@
 // Decoder robustness tests.
 // Verify that decode_qr recovers the original payload from a real QR matrix
-// across versions and ECC levels. Due to a known limitation in the decoder's
-// RS Forney algorithm (missing error-position factor X_k), single-bit flips
-// in non-last codeword positions may not be corrected. These tests therefore
-// verify the decoder's ACTUAL behavior: (1) clean matrices always decode
-// correctly, (2) at least one correctable flip exists in the data area,
+// across versions and ECC levels. After the RS Forney algorithm fix (adding
+// the error-position factor X_k = alpha^pos to the Forney formula), the
+// decoder correctly corrects single and multi-bit flips within the RS
+// correction capacity at ALL codeword positions (not just pos=0). These
+// tests verify: (1) clean matrices always decode correctly, (2) single-bit
+// flips in the data area are corrected and recover the original payload,
 // (3) the decoder never panics on corrupted input, and (4) flipping the same
 // bit twice restores the matrix. Data sizes are chosen to pin the requested
 // ECC level (avoiding auto-boost) so each test exercises the intended level.
@@ -302,8 +303,10 @@ test "robustness: V10 H correctable flip exists" {
 
 ///|
 test "robustness: decoder tolerates data bit flip" {
-  // Flip a data bit and call decode_qr. The decoder must return Some or None
-  // without panicking. This verifies graceful degradation on corrupted input.
+  // Flip a single data bit and verify decode_qr corrects it, recovering the
+  // original payload. After the Forney fix, single-bit flips in the data area
+  // are corrected by the RS decoder (V3 Medium has 16 ECC per block, well
+  // within the correction capacity for a 1-2 symbol error from one flip).
   let n = rob_pick_n(3, @qr.ecc_medium())
   if n < 0 {
     abort("robustness tolerate: no pinning data size found")
@@ -317,10 +320,9 @@ test "robustness: decoder tolerates data bit flip" {
   }
   let (x, y) = candidates[0]
   rob_flip_module(matrix, x, y)
-  // If decode_qr returns without aborting, the test passes.
   match @qr.decode_qr(matrix) {
-    Some(_) => assert_true(true)
-    None => assert_true(true)
+    Some(d) => assert_true(rob_bytes_eq(d, data))
+    None => abort("robustness tolerate: decode returned None")
   }
 }
 
@@ -397,9 +399,9 @@ test "robustness: flip same bit twice restores" {
 ///|
 test "robustness: multiple correctable single flips exist" {
   // Count how many single-bit flips in the data area the decoder can correct.
-  // At least 2 must exist: the ECC region spans multiple codewords, and flips
-  // in correctable codeword positions (e.g. the last ECC codeword) are
-  // corrected by the RS decoder.
+  // After the Forney fix, the RS decoder corrects single-symbol errors at ALL
+  // codeword positions, so a large fraction of data-area flips are correctable.
+  // We require at least 10 (previously 2, when only pos=0 was correctable).
   let n = rob_pick_n(2, @qr.ecc_low())
   if n < 0 {
     abort("robustness multi: no pinning data size found")
@@ -407,5 +409,36 @@ test "robustness: multiple correctable single flips exist" {
   let data = rob_random(n, 1050)
   let qr = @qr.encode_binary(data, @qr.ecc_low(), 2)
   let count = rob_count_correctable_flips(qr, data)
-  assert_true(count >= 2)
+  assert_true(count >= 10)
+}
+
+///|
+/// Two data-bit flips within the ECC correction capacity are corrected.
+/// After the Forney fix, the decoder corrects multi-symbol errors across all
+/// codeword positions. V3 Medium has 16 ECC per block (corrects 8 errors),
+/// so 2 module-bit flips (at most 4 symbol errors) are well within capacity.
+/// We search a bounded set of data-module pairs for a correctable pattern.
+test "robustness: two data bit flips correctable" {
+  let n = rob_pick_n(3, @qr.ecc_medium())
+  if n < 0 {
+    abort("robustness two flips: no pinning data size found")
+  }
+  let data = rob_random(n, 1060)
+  let qr = @qr.encode_binary(data, @qr.ecc_medium(), 3)
+  let candidates = rob_find_data_modules(qr, 12)
+  let mut found = false
+  for i = 0; i < candidates.length() && !found; i = i + 1 {
+    for j = i + 1; j < candidates.length() && !found; j = j + 1 {
+      let (x1, y1) = candidates[i]
+      let (x2, y2) = candidates[j]
+      let matrix = rob_qr_to_matrix(qr)
+      rob_flip_module(matrix, x1, y1)
+      rob_flip_module(matrix, x2, y2)
+      match @qr.decode_qr(matrix) {
+        Some(d) => if rob_bytes_eq(d, data) { found = true }
+        None => ()
+      }
+    }
+  }
+  assert_true(found)
 }
