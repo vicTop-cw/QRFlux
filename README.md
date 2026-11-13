@@ -22,13 +22,14 @@
 | QR 编码器（V1~V40 全版本，L/M/Q/H 四档纠错） | ✅ |
 | 自研 QR 解码器（V1~V40 全版本全模式，矩阵入口） | ✅ |
 | **图像入口解码（截图/像素 → 矩阵，自研全链路）** | ✅ |
+| **PNG 文件解码（灰度/RGB/RGBA，自研 chunk + 反 filter）** | ✅ |
 | 静态管线（压缩 + 打包 + 编解码） | ✅ |
 | 动态码流（分片 + LT 喷泉码 + 乱序 + 丢帧恢复） | ✅ |
 | 图片生成（PBM / SVG / PNG bit_depth=1） | ✅ |
 | 彩色 QR 无损编解码（4 色，2bits/module） | ✅ |
 | 彩色 QR RGB 识别 + SVG/PPM 图片生成 | ✅ |
 | CLI 编解码双向闭环 | ✅ |
-| WASM 绑定（编码 + 解码） | ✅ |
+| WASM 绑定（编码 + 解码函数就绪） | ⚠️ 未导出到 wasm，前端改走本地 API |
 | 前端编解码 UI（server.js + index.html） | ✅ |
 | 摄像头扫码（camera.html + jsQR） | ✅ |
 
@@ -44,6 +45,25 @@
 - **输入**：灰度像素矩阵（调用方从截图 / 相机帧 / 图片文件提取像素）
 - **鲁棒性**：支持缩放、平移、灰度噪声、非纯黑白屏幕、任意 90° 倍数旋转
 - **等价边界**：不含透视校正（斜拍强透视场景），亮度极端不均场景需调用方预处理
+
+**PNG 文件直读（自研）**：`decode_png_gray(bytes)` 支持非隔行灰度（bit depth 1/2/4/8）、
+RGB、灰度+Alpha、RGBA（8 位）；chunk 解析、反 filter（5 种）、位深/色彩展开自研，
+zlib 解压复用 MoonBit 标准库。CLI 可直接解码截图：
+
+```sh
+# PowerShell: 把 PNG 截图转 base64 交给自研解码器
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("shot.png"))
+moon run cmd/main -- --decode-image-b64 $b64
+```
+
+真实截图端到端验证（PIL 模拟灰度 / 缩放 / 模糊 / 噪声 / RGB / V3 / V5）：
+
+```sh
+python scripts/verify_image_pipeline.py    # 9/9 OK
+```
+
+**前端解码**：`web/camera.html` 主路径走本地 `/api/decode-image`（server.js 转发到 CLI
+自研解码器），jsQR 降级为 fallback；外部图像库不再在主路径上。
 
 
 ## 验证结果
@@ -140,3 +160,5 @@ reports/        任务汇报归档
 - 零三方依赖：不添加 `moon.mod` 外部依赖，所有核心算法自研。
 - 彩色 QR 码方案见 `docs/COLOR_QR_DESIGN.md`（非标准，4 色 2bits/module，已实现无损编解码 + RGB 识别 + SVG/PPM 图片生成，需专用解码器）。
 - 已知限制：V40 大尺寸 QR（177×177）部分第三方解码器存在解码限制（非 QRFlux 编码错误，单元测试验证编码正确，自研解码器可正常还原）。
+- CLI 图片传参受命令行长度限制（base64 ≈28KB）：大图 / 强噪声截图需先缩放或裁剪 QR 区域（超限会明确报错）。
+- 图像入口解码以仿射模型为界：覆盖缩放 / 平移 / 90° 倍数旋转，**不含透视校正**（斜拍场景待补 homography）。

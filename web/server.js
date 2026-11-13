@@ -127,6 +127,46 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API: decode image (base64 PNG screenshot -> self-implemented pixel decode)
+  // Uses the CLI's --decode-image-b64 path: PNG -> grayscale -> Otsu ->
+  // finder locate -> resample -> decode. Zero external image libraries.
+  if (req.url === '/api/decode-image' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        const { image } = JSON.parse(body);
+        // Strip a possible data: URL prefix, then check argument budget.
+        const b64 = String(image || '').replace(/^data:image\/\w+;base64,/, '');
+        if (!b64) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'missing image' }));
+          return;
+        }
+        // Windows command line is ~32KB: refuse oversized payloads with a
+        // clear message instead of a cryptic execSync failure.
+        if (b64.length > 28000) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: false,
+            error: 'image too large for CLI argument transport (' + b64.length + ' chars); move closer / crop the QR region'
+          }));
+          return;
+        }
+        const output = moonRun(`--decode-image-b64 "${b64}"`);
+        const failed = !output || /^Error/.test(output.trim());
+        const lines = (output || '').split('\n').filter(l => l.trim() && !l.startsWith('#'));
+        const decoded = failed ? '' : (lines.length ? lines[lines.length - 1].trim() : '');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: !failed, decoded, output }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
 });
@@ -135,5 +175,5 @@ server.listen(PORT, HOST, () => {
   console.log(`QRFlux server running at http://${HOST}:${PORT}/`);
   console.log(`  主页: http://${HOST}:${PORT}/`);
   console.log(`  摄像头: http://${HOST}:${PORT}/camera`);
-  console.log('API: /api/encode-static, /api/decode-static, /api/encode-dynamic, /api/decode-dynamic');
+  console.log('API: /api/encode-static, /api/decode-static, /api/encode-dynamic, /api/decode-dynamic, /api/decode-image');
 });

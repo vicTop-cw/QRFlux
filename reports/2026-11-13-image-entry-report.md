@@ -50,6 +50,23 @@
 3. **P2 局部自适应阈值**：Sauvola/分块 Otsu，抗亮度不均
 4. **P2 交叉验证升级**：`verify_qr.py` 增加「加噪截图 → 自研像素解码」环节，形成业界解码器 + 自研解码器双证
 
+## P1 追加：PNG 文件直读 + CLI 端到端 + 前端接线
+
+| 交付 | 说明 |
+|---|---|
+| `src/qr/png_decode.mbt` | PNG 解码：chunk 解析 + 反 filter + 位深/色彩展开自研，zlib 走标准库 |
+| `src/qr/png_decode_test.mbt` | 6 格：to_png 闭环 + 坏签名/截断/空输入拒收 |
+| CLI `--decode-image-b64` | base64 PNG → 自研像素解码 → payload |
+| `scripts/verify_image_pipeline.py` | 真实截图 E2E，9/9 OK |
+| `web/server.js` `/api/decode-image` | 本地 API 转发到 CLI 自研解码器 |
+| `web/camera.html` | 主路径走自研，jsQR 降级 |
+
+**实测**：moon test 1319/1319；CLI 端到端「Hello QRFlux image entry」24 字节还原；脚本 9/9（噪声/缩放/模糊/RGB/V3/V5）。
+
+**新发现落差**：wasm 产物只导出 memory + _start（QR 函数未导出），wasm_test.html 为空壳；README 的「WASM 绑定 ✅」已改为如实表述。
+
+**已知边界**：CLI 传参 ≈28KB 上限；无透视校正。
+
 ## 来源
 
 - 任务包：FIST-TASK-TREE.md T0.5

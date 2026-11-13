@@ -115,7 +115,41 @@
       }
     }
 
-    function captureAndDecode() {
+    // Downscale a canvas so its PNG stays within the CLI argument budget.
+    function downscaleCanvas(srcCanvas, maxDim) {
+      const scale = Math.min(1, maxDim / Math.max(srcCanvas.width, srcCanvas.height));
+      if (scale >= 1) return srcCanvas;
+      const c = document.createElement('canvas');
+      c.width = Math.round(srcCanvas.width * scale);
+      c.height = Math.round(srcCanvas.height * scale);
+      c.getContext('2d').drawImage(srcCanvas, 0, 0, c.width, c.height);
+      return c;
+    }
+
+    // Primary path: self-implemented decoder via the local server CLI.
+    async function decodeViaEngine(canvas) {
+      try {
+        const small = downscaleCanvas(canvas, 480);
+        const dataUrl = small.toDataURL('image/png');
+        const resp = await fetch('/api/decode-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: dataUrl })
+        });
+        const j = await resp.json();
+        if (j.success) {
+          showResult('✅ QRFlux 自研解码成功！<br><br><strong>数据:</strong> ' +
+            String(j.decoded).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])), '');
+          setStatus('✅ 自研解码成功');
+          return true;
+        }
+        return false;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function captureAndDecode() {
       if (!videoStream) { showResult('请先启动摄像头', 'error'); return; }
       const video = document.getElementById('camera-feed');
       const canvas = document.getElementById('capture-canvas');
@@ -124,19 +158,24 @@
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
 
-      // Try to decode from canvas
+      // Show captured image
+      const img = document.getElementById('captured-image');
+      img.src = canvas.toDataURL('image/png');
+      img.style.display = 'block';
+
+      // Primary: self-implemented decoder (Otsu + finder + resample), no
+      // external library in the loop.
+      if (await decodeViaEngine(canvas)) return;
+
+      // Fallback: in-browser jsQR if the local engine is unavailable.
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: 'attemptBoth'
       });
 
       if (code) {
-        showResult(`✅ QR 码解码成功！<br><br><strong>数据:</strong> ${code.data}<br><br><strong>位置:</strong> (${code.location.topLeftCorner.x.toFixed(0)}, ${code.location.topLeftCorner.y.toFixed(0)})`, '');
-        setStatus('✅ 解码成功');
-        // Show captured image
-        const img = document.getElementById('captured-image');
-        img.src = canvas.toDataURL('image/png');
-        img.style.display = 'block';
+        showResult(`✅ jsQR 降级解码成功！<br><br><strong>数据:</strong> ${code.data}`, '');
+        setStatus('✅ 解码成功（jsQR 降级）');
       } else {
         showResult('❌ 未检测到 QR 码，请调整角度和距离后重试', 'error');
         setStatus('❌ 未检测到 QR 码');
