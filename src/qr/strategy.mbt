@@ -3,12 +3,13 @@
 
 ///|
 /// Compression strategy.
+#derive(Eq, Debug)
 pub enum CompressionStrategy {
   NoCompress
   FastRLE
   BestSpeed
   Balanced
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend CompressionStrategy with Eq::{not_equal, equal}
@@ -39,11 +40,12 @@ pub fn strategy_balanced() -> CompressionStrategy {
 
 ///|
 /// Compression level.
+#derive(Eq, Debug)
 pub enum CompressionLevel {
   NoCompress
   Fast
   Best
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend CompressionLevel with Eq::{not_equal, equal}

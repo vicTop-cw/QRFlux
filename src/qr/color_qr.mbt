@@ -4,12 +4,13 @@
 ///|
 /// Color mapping for 4-color QR.
 /// Each color represents 2 bits of data.
+#derive(Eq, Debug)
 pub enum ColorQRColor {
   White // 00 - 0xFFFFFF
   Red // 01 - 0xFF0000
   Green // 10 - 0x00FF00
   Blue // 11 - 0x0000FF
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend ColorQRColor with Eq::{not_equal, equal}

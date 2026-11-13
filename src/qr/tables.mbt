@@ -56,12 +56,13 @@ pub let num_ecc_blocks_high : FixedArray[Int32] = [
 ]
 
 ///|
+#derive(Eq, Debug)
 pub enum EccLevel {
   Low
   Medium
   Quartile
   High
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend EccLevel with Eq::{not_equal, equal}
