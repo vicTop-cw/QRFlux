@@ -1,6 +1,7 @@
 import {
   "vicTop-cw/QRFlux/src/qr",
   "moonbitlang/core/env",
+  "moonbitlang/core/encoding/base64",
 }
 
 pkgtype(kind: "executable")

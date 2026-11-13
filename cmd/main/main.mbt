@@ -355,6 +355,35 @@ fn bytes_to_display(bytes : FixedArray[Int32]) -> String {
 }
 
 ///|
+/// Run image decode: base64 PNG (screenshot) -> grayscale pixels ->
+/// decode_from_pixels -> original data. Self-implemented image entry,
+/// zero external image libraries.
+fn run_decode_image(b64 : String) -> Unit {
+  let png : Bytes = @base64.decode(b64) catch {
+    _ => {
+      println("Error: invalid base64 image data")
+      return
+    }
+  }
+  let gray = match @qr.decode_png_gray(png) {
+    Some(g) => g
+    None => {
+      println(
+        "Error: unsupported or corrupt PNG (need non-interlaced grayscale/RGB)",
+      )
+      return
+    }
+  }
+  match @qr.decode_from_pixels(gray) {
+    Some(data) => {
+      println("# decoded from image: " + data.length().to_string() + " bytes")
+      println(bytes_to_display(data))
+    }
+    None => println("Error: no decodable QR code found in image")
+  }
+}
+
+///|
 /// Run static decode: hex (packaged bytes) -> decode_static -> original data.
 fn run_decode_static(hex : String) -> Unit {
   match hex_to_bytes(hex) {
@@ -474,6 +503,12 @@ fn print_usage() -> Unit {
     "    Decode dynamic stream data from frame bytes (hex, semicolon-separated).",
   )
   println("")
+  println("  moon run cmd/main -- --decode-image-b64 <base64_png>")
+  println(
+    "    Decode a QR code from a PNG screenshot (base64-encoded PNG bytes).",
+  )
+  println("    Self-implemented image entry: Otsu + finder locate + resample.")
+  println("")
   println("Formats:")
   println("  pbm  - Portable Bitmap ASCII (P1), text output")
   println("  svg  - SVG vector image, text output")
@@ -592,6 +627,8 @@ fn run_cli(args : Array[String]) -> Unit {
   let mut use_decode_static : Bool = false
   let mut use_decode_dynamic : Bool = false
   let mut hex_data : String = ""
+  let mut b64_data : String = ""
+  let mut use_decode_image : Bool = false
   let mut frame_size : Int32 = 500
   let mut i = 1
   while i < args.length() {
@@ -620,6 +657,12 @@ fn run_cli(args : Array[String]) -> Unit {
       use_decode_static = true
     } else if a == "--decode-dynamic" {
       use_decode_dynamic = true
+    } else if a == "--decode-image-b64" {
+      i = i + 1
+      if i < args.length() {
+        b64_data = args[i]
+        use_decode_image = true
+      }
     } else if a == "--hex" {
       i = i + 1
       if i < args.length() {
@@ -642,6 +685,10 @@ fn run_cli(args : Array[String]) -> Unit {
     i = i + 1
   }
   // Decode modes (don't require --text, use --hex instead)
+  if use_decode_image {
+    run_decode_image(b64_data)
+    return
+  }
   if use_decode_static {
     if hex_data == "" {
       println("Error: --hex is required for --decode-static")
