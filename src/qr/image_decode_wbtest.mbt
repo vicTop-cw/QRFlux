@@ -249,3 +249,174 @@ test "wb sample_matrix rejects invalid size" {
   let bl : FinderPoint = { cx: 10.0, cy: 35.0, unit_px: 2.0, }
   assert_true(sample_matrix(bits, tl, tr, bl) is None)
 }
+
+///|
+/// Warp a grayscale bitmap through a perspective transform: the source
+/// corners (TL, TR, BR, BL) are mapped to four destination points,
+/// simulating a photo taken at an angle. Inverse-samples the source.
+fn wb_warp(
+  src : FixedArray[FixedArray[Int32]],
+  dst_w : Int32,
+  dst_h : Int32,
+  p0 : (Double, Double),
+  p1 : (Double, Double),
+  p2 : (Double, Double),
+  p3 : (Double, Double),
+) -> FixedArray[FixedArray[Int32]] {
+  let sw = src[0].length()
+  let sh = src.length()
+  let us = FixedArray::make(4, 0.0)
+  let vs = FixedArray::make(4, 0.0)
+  let xs = FixedArray::make(4, 0.0)
+  let ys = FixedArray::make(4, 0.0)
+  let dps = [p0, p1, p2, p3]
+  let spx = [0.0, (sw - 1).to_double(), (sw - 1).to_double(), 0.0]
+  let spy = [0.0, 0.0, (sh - 1).to_double(), (sh - 1).to_double()]
+  for i = 0; i < 4; i = i + 1 {
+    let (dx, dy) = dps[i]
+    us[i] = dx
+    vs[i] = dy
+    xs[i] = spx[i]
+    ys[i] = spy[i]
+  }
+  let h = match solve_homography(us, vs, xs, ys) {
+    Some(v) => v
+    None => abort("wb_warp: homography solve failed")
+  }
+  let out : FixedArray[FixedArray[Int32]] = FixedArray::make(
+    dst_h,
+    FixedArray::make(dst_w, 255),
+  )
+  for y = 0; y < dst_h; y = y + 1 {
+    out[y] = FixedArray::make(dst_w, 255)
+    let v = y.to_double()
+    for x = 0; x < dst_w; x = x + 1 {
+      let u = x.to_double()
+      let den = h[6] * u + h[7] * v + 1.0
+      if dabs(den) < 1.0e-9 {
+        continue
+      }
+      let sx = (h[0] * u + h[1] * v + h[2]) / den
+      let sy = (h[3] * u + h[4] * v + h[5]) / den
+      let ix = (sx + 0.5).to_int()
+      let iy = (sy + 0.5).to_int()
+      if ix >= 0 && ix < sw && iy >= 0 && iy < sh {
+        out[y][x] = src[iy][ix]
+      }
+    }
+  }
+  out
+}
+
+///|
+/// Build a V(n) QR bitmap at the given scale for warp tests.
+fn wb_qr_bitmap(
+  data : FixedArray[Int32],
+  version : Int32,
+  scale : Int32,
+  quiet : Int32,
+) -> FixedArray[FixedArray[Int32]] {
+  let qr = encode_binary(data, ecc_low(), version)
+  let size = qr.size()
+  let m : FixedArray[FixedArray[Int32]] = FixedArray::make(
+    size,
+    FixedArray::make(size, 0),
+  )
+  for y = 0; y < size; y = y + 1 {
+    m[y] = FixedArray::make(size, 0)
+    for x = 0; x < size; x = x + 1 {
+      m[y][x] = if qr.get_module(x, y) { 1 } else { 0 }
+    }
+  }
+  wb_render(m, scale, quiet)
+}
+
+///|
+/// Mechanism check: finder center rows are 1:1:3:1:1 and must NOT be
+/// picked up by the 1:1:1:1:1 alignment scanner.
+test "wb alignment scan ignores finder rows" {
+  let w = 7
+  let bits : FixedArray[FixedArray[Bool]] = FixedArray::make(
+    1,
+    FixedArray::make(w, false),
+  )
+  bits[0] = FixedArray::make(w, false)
+  for x = 0; x < w; x = x + 1 {
+    bits[0][x] = match x {
+      0 => true
+      1 => false
+      2 | 3 | 4 => true
+      5 => false
+      _ => true
+    }
+  }
+  assert_true(scan_alignment_hits(bits, 0, 0).length() == 0)
+}
+
+///|
+/// Mechanism check: a true 1:1:1:1:1 profile (alignment pattern) is
+/// detected and centered on the middle run.
+test "wb alignment scan detects 1:1:1:1:1" {
+  let w = 5
+  let bits : FixedArray[FixedArray[Bool]] = FixedArray::make(
+    1,
+    FixedArray::make(w, false),
+  )
+  bits[0] = FixedArray::make(w, false)
+  for x = 0; x < w; x = x + 1 {
+    bits[0][x] = x % 2 == 0
+  }
+  let hits = scan_alignment_hits(bits, 0, 0)
+  assert_true(hits.length() == 1)
+  assert_true(dabs(hits[0].center - 2.5) < 0.01)
+}
+
+///|
+/// Sanity: an unwarped source decodes through the affine path.
+test "wb unwarped source decodes" {
+  let data : FixedArray[Int32] = FixedArray::make(20, 0)
+  for i = 0; i < 20; i = i + 1 {
+    data[i] = (i * 53 + 7) & 0xFF
+  }
+  let src = wb_qr_bitmap(data, 2, 8, 4)
+  match decode_from_pixels(src) {
+    Some(bytes) => assert_true(bytes.length() == data.length())
+    None => abort("unwarped source did not decode")
+  }
+}
+
+///|
+/// Perspective correction: a QR photographed at an angle (trapezoidal
+/// warp) must still decode. The affine model cannot represent this
+/// distortion, so this exercises the homography fallback anchored on
+/// the alignment pattern.
+test "wb perspective warp decodes through homography" {
+  let data : FixedArray[Int32] = FixedArray::make(20, 0)
+  for i = 0; i < 20; i = i + 1 {
+    data[i] = (i * 53 + 7) & 0xFF
+  }
+  let src = wb_qr_bitmap(data, 2, 8, 4)
+  let d = src.length()
+  let dst_w = d + 100
+  let dst_h = d + 100
+  let warp = wb_warp(
+    src,
+    dst_w,
+    dst_h,
+    (60.0, 40.0),
+    (d.to_double() + 40.0, 10.0),
+    (d.to_double() + 60.0, d.to_double() + 90.0),
+    (40.0, d.to_double() + 60.0),
+  )
+  match decode_from_pixels(warp) {
+    Some(bytes) => {
+      assert_true(bytes.length() == data.length())
+      for i = 0; i < data.length(); i = i + 1 {
+        if bytes[i] != data[i] {
+          abort("warp decode byte \{i}: got \{bytes[i]}, want \{data[i]}")
+        }
+      }
+    }
+    None => abort("perspective warp did not decode")
+  }
+}

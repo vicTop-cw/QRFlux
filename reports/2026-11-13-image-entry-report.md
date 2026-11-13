@@ -67,6 +67,23 @@
 
 **已知边界**：CLI 传参 ≈28KB 上限；无透视校正。
 
+## P2 追加：透视校正（homography + alignment pattern）
+
+| 交付 | 说明 |
+|---|---|
+| `scan_alignment_hits` | 1:1:1:1:1 剖面扫描（与 finder 1:1:3:1:1 区分） |
+| `solve_linear_8` / `solve_homography` | 8×8 高斯消元求四点单应 |
+| `sample_matrix_homography` | 单应反投影采样 |
+| `find_alignment_point` | 仿射引导 + 局部搜索 alignment 候选 |
+| `try_decode_perspective` | 仿射失败后的透视回退（右下 alignment 作第四点） |
+| 测试 4 格 | 透视变形 helper + 机制格 ×2 + 对照 + 梯形端到端 |
+
+**变异对照**：注入 `return None` 禁用单应 → 仅透视线程红（1322/1323），证明因果成立；移除后 1323/1323。
+
+**实测**：moon test 1323/1323；fmt/check 全绿；交叉验证 165/165。
+
+**边界**：V1 无 alignment pattern，仅仿射；V2+ 支持透视。
+
 ## 来源
 
 - 任务包：FIST-TASK-TREE.md T0.5

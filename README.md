@@ -13,7 +13,7 @@
 
 ## 当前状态
 
-48 轮迭代全部完成，图像入口（T0.5）补全后项目可发布。**1313/1313 测试全绿，165/165 交叉验证通过**（2026-11-13 本机实测）。详细用法见 [USAGE.md](USAGE.md)。
+48 轮迭代全部完成，图像入口（T0.5）补全后项目可发布。**1323/1323 测试全绿，165/165 交叉验证通过**（2026-11-13 本机实测）。详细用法见 [USAGE.md](USAGE.md)。
 
 ## 能力清单
 
@@ -22,6 +22,7 @@
 | QR 编码器（V1~V40 全版本，L/M/Q/H 四档纠错） | ✅ |
 | 自研 QR 解码器（V1~V40 全版本全模式，矩阵入口） | ✅ |
 | **图像入口解码（截图/像素 → 矩阵，自研全链路）** | ✅ |
+| **透视校正（斜拍，homography + alignment pattern）** | ✅ V2+ |
 | **PNG 文件解码（灰度/RGB/RGBA，自研 chunk + 反 filter）** | ✅ |
 | 静态管线（压缩 + 打包 + 编解码） | ✅ |
 | 动态码流（分片 + LT 喷泉码 + 乱序 + 丢帧恢复） | ✅ |
@@ -44,7 +45,8 @@
 
 - **输入**：灰度像素矩阵（调用方从截图 / 相机帧 / 图片文件提取像素）
 - **鲁棒性**：支持缩放、平移、灰度噪声、非纯黑白屏幕、任意 90° 倍数旋转
-- **等价边界**：不含透视校正（斜拍强透视场景），亮度极端不均场景需调用方预处理
+- **透视校正**：三点仿射失败后，自动用右下 alignment pattern 锚定四点 homography 重采样（V2+ 有 alignment；V1 仅仿射）
+- **等价边界**：亮度极端不均场景需调用方预处理；V1 无 alignment pattern 故不覆盖强透视
 
 **PNG 文件直读（自研）**：`decode_png_gray(bytes)` 支持非隔行灰度（bit depth 1/2/4/8）、
 RGB、灰度+Alpha、RGBA（8 位）；chunk 解析、反 filter（5 种）、位深/色彩展开自研，
@@ -72,11 +74,11 @@ python scripts/verify_image_pipeline.py    # 9/9 OK
 |---|---|---|
 | moon fmt --check | 通过 | `moon fmt --check` |
 | moon check | 0 errors, 0 warnings | `moon check` |
-| moon test --target js | **1313/1313** | `moon test --target js` |
+| moon test --target js | **1323/1323** | `moon test --target js` |
 | 交叉验证（zxing-cpp，V1~V40 全版本全纠错级全模式） | **165/165 OK** | `moon run cmd/main > batch.txt && python scripts/verify_qr.py batch.txt` |
 | WASM（release） | 56968 字节（≈56KB） | `moon build --target wasm --release` |
 
-### 测试覆盖分类（1313 个测试）
+### 测试覆盖分类（1323 个测试）
 
 | 类别 | 数量 | 覆盖内容 |
 |------|------|----------|
@@ -161,4 +163,4 @@ reports/        任务汇报归档
 - 彩色 QR 码方案见 `docs/COLOR_QR_DESIGN.md`（非标准，4 色 2bits/module，已实现无损编解码 + RGB 识别 + SVG/PPM 图片生成，需专用解码器）。
 - 已知限制：V40 大尺寸 QR（177×177）部分第三方解码器存在解码限制（非 QRFlux 编码错误，单元测试验证编码正确，自研解码器可正常还原）。
 - CLI 图片传参受命令行长度限制（base64 ≈28KB）：大图 / 强噪声截图需先缩放或裁剪 QR 区域（超限会明确报错）。
-- 图像入口解码以仿射模型为界：覆盖缩放 / 平移 / 90° 倍数旋转，**不含透视校正**（斜拍场景待补 homography）。
+- 图像入口解码：仿射模型覆盖缩放 / 平移 / 90° 倍数旋转，**V2+ 追加透视校正**（alignment pattern 锚定 homography）；V1 无 alignment pattern，仅仿射。
