@@ -5,10 +5,12 @@
 // Build: moon build --target js --release
 //        moon build --target wasm-gc --release
 //
-// STATUS (2026-11-13): exports verified present in both artifacts; see
-// src/wasmapi/api.mbt header and memory/2026-11-13.md for the known
-// long-input issue on the js backend that keeps the frontend on the
-// local server API path.
+// STATUS (2026-11-13): exports verified present in both artifacts.
+// NOT IN USE: the same decode logic is correct under `moon test` and on
+// native, but the artifact built from this package returns wrong bytes
+// for real PNG decodes on the js backend (verified: base64 in-package is
+// byte-exact, grayscale dimensions correct, final payload wrong). See
+// src/wasmapi/api.mbt header and memory/2026-11-13.md.
 import {
   "vicTop-cw/QRFlux/src/web",
 }

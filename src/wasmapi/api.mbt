@@ -4,13 +4,22 @@
 /// Build: moon build --target js --release
 ///        moon build --target wasm-gc --release
 ///
-/// STATUS (2026-11-13): exports are configured and verified to appear in
-/// the artifact (3 symbols, via `WebAssembly.Module.exports` / ESM
-/// `export {...}`). However a long-input decode through this
-/// foreign_library build returns wrong bytes on the js backend while the
-/// identical logic is correct in normal builds and on native (isolated to
-/// cross-package long-string arguments; see memory/2026-11-13.md).
-/// The web frontend therefore keeps using the local server API path.
+/// STATUS (2026-11-13): the three symbols below are present in both the
+/// wasm-gc and js artifacts (verified via `WebAssembly.Module.exports`
+/// and ESM `export {...}`) and are callable from Node.
+///
+/// They are NOT wired into the web frontend. Reason: decoding a real
+/// screenshot through this foreign_library build returns wrong payload
+/// bytes on the js backend, while the identical logic is correct under
+/// `moon test --target js` and on native. Isolation so far:
+///   - base64 decoding inside this package: byte-exact (PNG signature OK)
+///   - grayscale dimensions after PNG decode: correct
+///   - final payload: wrong (e.g. "RVTw..." instead of "Hi")
+/// Non-strings, Buffer writes, bit arithmetic, string traversal and
+/// cross-package calls were each verified correct in isolation.
+/// Conclusion: a build-context difference in the artifact (toolchain
+/// level); see memory/2026-11-13.md for the full elimination table.
+/// The frontend therefore keeps using the local server API path.
 
 ///|
 /// Encode a QR code; returns a JSON envelope with the module matrix.

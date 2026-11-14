@@ -91,6 +91,10 @@
 - **未交付原因**：js 引擎长输入返回乱码（`ok:true` 但内容错，native 同一 PNG 正确）——静默错值。逐步排除 release/base64/迭代器/字符串/Buffer/位运算/短跨包后，隔离到「foreign_library 构建下跨包长字符串参数」；确切根因未定位（工具链层面）。
 - **顺带修真 bug**：server.js `execSync`（cmd.exe ~8191 上限）→ `spawnSync` argv 数组，19012 字符负载实测 HTTP 200 精确还原。
 
+### 深挖一轮：定位收窄（跨包假设否证）
+
+继续隔离后确认：跨包长字符串、包内纯算式、包内 Buffer 大量写入、包内 base64、PNG 灰度尺寸**全部正确**；错误只出现在 `@qr.decode_from_pixels` 一路。同代码在 `moon test --target js`（1323 全绿）与 native（CLI 实测正确）无误 → 判定为**构建上下文相关的产物差异（工具链层面）**，非应用层缺陷。已收敛：导出面保留但标注未投入使用，前端走 server API。
+
 ## 来源
 
 - 任务包：FIST-TASK-TREE.md T0.5
