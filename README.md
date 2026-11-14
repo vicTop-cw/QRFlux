@@ -30,7 +30,7 @@
 | 彩色 QR 无损编解码（4 色，2bits/module） | ✅ |
 | 彩色 QR RGB 识别 + SVG/PPM 图片生成 | ✅ |
 | CLI 编解码双向闭环 | ✅ |
-| WASM 绑定（编码 + 解码函数就绪） | ⚠️ 未导出到 wasm，前端改走本地 API |
+| WASM/JS 导出（wasm-gc 与 js 后端） | ⚠️ 导出符号已验证；js 后端长输入有构建上下文问题，前端走本地 API |
 | 前端编解码 UI（server.js + index.html） | ✅ |
 | 摄像头扫码（camera.html + jsQR） | ✅ |
 
@@ -64,8 +64,15 @@ moon run cmd/main -- --decode-image-b64 $b64
 python scripts/verify_image_pipeline.py    # 9/9 OK
 ```
 
-**前端解码**：`web/camera.html` 主路径走本地 `/api/decode-image`（server.js 转发到 CLI
-自研解码器），jsQR 降级为 fallback；外部图像库不再在主路径上。
+**前端解码**：`web/camera.html` 主路径走本地 `/api/decode-image`（server.js 用 `spawnSync`
+以 argv 数组转发到 CLI 自研解码器，绕过 Windows cmd.exe 的 ~8KB 命令行上限），jsQR 降级为
+fallback；外部图像库不再在主路径上。
+
+**导出面（`src/wasmapi`，foreign_library）**：`qrflux_encode_qr` / `qrflux_decode_image_png` /
+`qrflux_decode_qr` 三个符号在 wasm-gc 与 js 产物中均已验证存在（`WebAssembly.Module.exports`
+与 ESM `export {...}` 实测）。**未投入使用**：同一份逻辑在普通构建与 native 下正确，
+但经该 foreign_library 构建在 js 后端对长输入返回错误字节（长度正确、内容错乱），
+已隔离到跨包长字符串参数；详见 memory/2026-11-13.md 与 `src/wasmapi/api.mbt` 头注释。
 
 
 ## 验证结果
@@ -164,3 +171,4 @@ reports/        任务汇报归档
 - 已知限制：V40 大尺寸 QR（177×177）部分第三方解码器存在解码限制（非 QRFlux 编码错误，单元测试验证编码正确，自研解码器可正常还原）。
 - CLI 图片传参受命令行长度限制（base64 ≈28KB）：大图 / 强噪声截图需先缩放或裁剪 QR 区域（超限会明确报错）。
 - 图像入口解码：仿射模型覆盖缩放 / 平移 / 90° 倍数旋转，**V2+ 追加透视校正**（alignment pattern 锚定 homography）；V1 无 alignment pattern，仅仿射。
+- 前端图像解码经本地 server 转发给 CLI（浏览器内引擎的 js 后端长输入仍有构建上下文问题，未启用）。

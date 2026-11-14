@@ -84,6 +84,13 @@
 
 **边界**：V1 无 alignment pattern，仅仿射；V2+ 支持透视。
 
+## 追加：push 上线 + wasm/js 导出尝试
+
+- **push**：109 commit 推上 GitHub（`1d1755a..9d72af6`，远端回读确认）。HTTPS 因凭证助手弹窗挂起 → 改走 SSH（显式 IdentityFile + known_hosts）。
+- **导出面**（`src/wasmapi`，foreign_library）：3 个符号在 wasm-gc/js 产物中均验证存在；js 产物为 ESM，node 可 import 调用。
+- **未交付原因**：js 引擎长输入返回乱码（`ok:true` 但内容错，native 同一 PNG 正确）——静默错值。逐步排除 release/base64/迭代器/字符串/Buffer/位运算/短跨包后，隔离到「foreign_library 构建下跨包长字符串参数」；确切根因未定位（工具链层面）。
+- **顺带修真 bug**：server.js `execSync`（cmd.exe ~8191 上限）→ `spawnSync` argv 数组，19012 字符负载实测 HTTP 200 精确还原。
+
 ## 来源
 
 - 任务包：FIST-TASK-TREE.md T0.5

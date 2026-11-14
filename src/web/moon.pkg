@@ -2,6 +2,7 @@
 // Exposes static and dynamic QR encoding/decoding to JavaScript.
 import {
   "vicTop-cw/QRFlux/src/qr",
+  "moonbitlang/core/encoding/base64",
 }
 
 pkgtype(kind: "library")

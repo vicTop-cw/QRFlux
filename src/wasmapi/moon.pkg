@@ -1,0 +1,30 @@
+// WASM/JS export surface for QRFlux.
+// A foreign_library package re-exporting the web bindings under stable
+// symbol names, so a JavaScript host can call them directly.
+//
+// Build: moon build --target js --release
+//        moon build --target wasm-gc --release
+//
+// STATUS (2026-11-13): exports verified present in both artifacts; see
+// src/wasmapi/api.mbt header and memory/2026-11-13.md for the known
+// long-input issue on the js backend that keeps the frontend on the
+// local server API path.
+import {
+  "vicTop-cw/QRFlux/src/web",
+}
+
+pkgtype(kind: "foreign_library")
+
+options(
+  link: {
+    "wasm-gc": { "use-js-builtin-string": true },
+    "js": {
+      "exports": [
+        "qrflux_encode_qr",
+        "qrflux_decode_image_png",
+        "qrflux_decode_qr",
+      ],
+      "format": "esm",
+    },
+  },
+)
