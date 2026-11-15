@@ -102,6 +102,14 @@
 - 申报书同步：测试数 1323、新增 PNG 直读/透视校正/浏览器内引擎（如实标注）能力行、已知限制三条、读数日期与 commits 更新
 - 详见 memory/2026-11-15.md
 
+## 2026-11-15 续 2：T0.6 多格式图片支持
+
+- **BMP 解码器**（自研）：24/32bpp + 8/1bit 调色板 + bottom-up/top-down，9 格测试
+- **统一入口** `decode_image_gray`（魔数分流 PNG/BMP），web 与 CLI 共用
+- **E2E 升级**：16 用例（PNG 9 + BMP raw 2 + GIF/TIFF/JPEG×2/WebP）**16/16 全绿**
+- **抓到真 bug**：BMP bottom-up 行分配时序错误（row 索引重分配覆盖转置行 y 的写入），修复后 1332/1332
+- **边界**：24-bit color BMP 因 CLI 传参限制（WinError 206 / ~30KB）+ 分辨率物理下限不可直喂；JPEG/GIF/TIFF/WebP 走格式无关路径（PIL 读像素 → 自研解码），无损传输本质是像素无损
+
 ## 来源
 
 - 任务包：FIST-TASK-TREE.md T0.5

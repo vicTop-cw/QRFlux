@@ -13,7 +13,7 @@
 
 ## 当前状态
 
-48 轮迭代全部完成，图像入口（T0.5）补全后项目可发布。**1323/1323 测试全绿，165/165 交叉验证通过**（2026-11-13 本机实测）。详细用法见 [USAGE.md](USAGE.md)。
+48 轮迭代 + 图像入口（T0.5）与多格式（T0.6）交付后项目可发布。**1332/1332 测试全绿，165/165 交叉验证通过**（2026-11-15 本机实测）。详细用法见 [USAGE.md](USAGE.md)。
 
 ## 能力清单
 
@@ -24,6 +24,7 @@
 | **图像入口解码（截图/像素 → 矩阵，自研全链路）** | ✅ |
 | **透视校正（斜拍，homography + alignment pattern）** | ✅ V2+ |
 | **PNG 文件解码（灰度/RGB/RGBA，自研 chunk + 反 filter）** | ✅ |
+| **BMP 文件解码（24/32bpp + 8/1bit 调色板，自研）** | ✅ |
 | 静态管线（压缩 + 打包 + 编解码） | ✅ |
 | 动态码流（分片 + LT 喷泉码 + 乱序 + 丢帧恢复） | ✅ |
 | 图片生成（PBM / SVG / PNG bit_depth=1） | ✅ |
@@ -61,7 +62,7 @@ moon run cmd/main -- --decode-image-b64 $b64
 真实截图端到端验证（PIL 模拟灰度 / 缩放 / 模糊 / 噪声 / RGB / V3 / V5）：
 
 ```sh
-python scripts/verify_image_pipeline.py    # 9/9 OK
+python scripts/verify_image_pipeline.py    # 16/16 OK（PNG/BMP/GIF/TIFF/JPEG/WebP 多格式 + 扰动矩阵）
 ```
 
 **前端解码**：`web/camera.html` 主路径走本地 `/api/decode-image`（server.js 用 `spawnSync`
@@ -81,11 +82,11 @@ fallback；外部图像库不再在主路径上。
 |---|---|---|
 | moon fmt --check | 通过 | `moon fmt --check` |
 | moon check | 0 errors, 0 warnings | `moon check` |
-| moon test --target js | **1323/1323** | `moon test --target js` |
+| moon test --target js | **1332/1332** | `moon test --target js` |
 | 交叉验证（zxing-cpp，V1~V40 全版本全纠错级全模式） | **165/165 OK** | `moon run cmd/main > batch.txt && python scripts/verify_qr.py batch.txt` |
 | WASM（release） | 56968 字节（≈56KB） | `moon build --target wasm --release` |
 
-### 测试覆盖分类（1323 个测试）
+### 测试覆盖分类（1332 个测试）
 
 | 类别 | 数量 | 覆盖内容 |
 |------|------|----------|

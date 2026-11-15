@@ -365,11 +365,11 @@ fn run_decode_image(b64 : String) -> Unit {
       return
     }
   }
-  let gray = match @qr.decode_png_gray(png) {
+  let gray = match @qr.decode_image_gray(png) {
     Some(g) => g
     None => {
       println(
-        "Error: unsupported or corrupt PNG (need non-interlaced grayscale/RGB)",
+        "Error: unsupported or corrupt image (need non-interlaced PNG or uncompressed BMP)",
       )
       return
     }

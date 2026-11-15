@@ -43,6 +43,25 @@ pub fn bytes_of_i32(data : FixedArray[Int32]) -> Bytes {
 }
 
 ///|
+/// Unified image entry: sniff the magic bytes and dispatch to the
+/// self-implemented decoder for that format (currently PNG and BMP).
+/// Returns None for unsupported or corrupt input.
+pub fn decode_image_gray(data : Bytes) -> FixedArray[FixedArray[Int32]]? {
+  let n = data.length()
+  if n >= 8 &&
+    data[0].to_int() == 0x89 &&
+    data[1].to_int() == 0x50 &&
+    data[2].to_int() == 0x4E &&
+    data[3].to_int() == 0x47 {
+    return decode_png_gray(data)
+  }
+  if n >= 2 && data[0].to_int() == 0x42 && data[1].to_int() == 0x4D {
+    return decode_bmp_gray(data)
+  }
+  None
+}
+
+///|
 /// Decode a non-interlaced PNG into a grayscale bitmap (0..255).
 /// Supported color types: 0 (gray, bit depth 1/2/4/8), 2 (RGB 8-bit),
 /// 4 (gray+alpha 8-bit), 6 (RGBA 8-bit). Returns None for unsupported

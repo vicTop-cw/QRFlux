@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""End-to-end check: real PNG screenshot -> self-implemented pixel decoder.
+"""End-to-end check: real screenshots in many formats -> self-implemented
+pixel decoder.
 
-Flow:
-  1. encode a payload to a PNG via the moon CLI (QRFlux's own encoder)
-  2. simulate a screenshot with PIL: grayscale, resize, gaussian blur, noise
-  3. base64 the PNG and decode it with the moon CLI --decode-image-b64
-     (Otsu binarization + finder localization + affine resample + decode)
-  4. compare the decoded payload with the original
+Two paths are exercised:
 
-This exercises the full "remote machine shows a QR image, local side
-decodes the screenshot" loop with zero external image libraries in the
-MoonBit pipeline. Note PIL writes standard dynamically-compressed PNGs,
-so this also checks the decoder against non-stored zlib streams.
+1. **Self-decoded raw formats** — the CLI sniffs the magic bytes and runs
+   the self-implemented decoder (currently PNG and BMP). BMP cases feed
+   the raw BMP bytes directly (Windows clipboard scenario).
+2. **Format-agnostic screenshots** — PIL writes the QR image as
+   GIF/TIFF/JPEG/WebP, reads it back, converts to grayscale PNG and feeds
+   the decoder. This models "the remote machine sent whatever format it
+   had": as long as the pixels survive, the transmission is lossless.
 
 Usage:
   python scripts/verify_image_pipeline.py
@@ -26,10 +25,10 @@ import sys
 from PIL import Image, ImageFilter
 
 PROJ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MAX_B64 = 30000
 
 
 def moon(args, timeout=180):
-    """Run the moon CLI with args; return (rc, stdout, stderr)."""
     cmd = ["moon", "run", "cmd/main", "--"] + args
     r = subprocess.run(
         cmd, capture_output=True, cwd=PROJ, timeout=timeout, shell=False
@@ -42,7 +41,6 @@ def moon(args, timeout=180):
 
 
 def parse_payload(stdout):
-    """Extract the payload line from CLI output (skip '#' comment lines)."""
     for line in stdout.splitlines():
         s = line.strip()
         if s and not s.startswith("#"):
@@ -58,21 +56,19 @@ def encode_png(payload, ecl="M"):
     return base64.b64decode(b64)
 
 
-MAX_B64 = 28000
+def fit_for_cli(img, fmt="PNG", quality=None):
+    """Encode to `fmt`, downscaling until the base64 fits the CLI budget.
 
-
-def fit_for_cli(img):
-    """Encode to PNG, downscaling until the base64 fits the CLI budget.
-
-    Windows command lines cap out around 32 KB, so an over-large PNG
-    (e.g. a noisy screenshot) is downscaled like a user would crop/zoom
-    before handing it to the decoder.
+    Windows CreateProcess caps the whole command line at ~32 KB, so an
+    over-large image is downscaled the way a user would crop/zoom before
+    handing it to the decoder.
     """
     scale = 1.0
     data = b""
     for _ in range(10):
         buf = io.BytesIO()
-        img.save(buf, "PNG")
+        kwargs = {"quality": quality} if quality else {}
+        img.save(buf, fmt, **kwargs)
         data = buf.getvalue()
         if len(base64.b64encode(data)) <= MAX_B64:
             return data, scale
@@ -84,8 +80,9 @@ def fit_for_cli(img):
     return data, scale
 
 
-def decode_png(png_bytes):
-    b64 = base64.b64encode(png_bytes).decode("ascii")
+def decode_raw(data):
+    """Feed raw image bytes (any sniffer-supported format) to the CLI."""
+    b64 = base64.b64encode(data).decode("ascii")
     if len(b64) > MAX_B64:
         return None
     rc, out, err = moon(["--decode-image-b64", b64])
@@ -94,26 +91,45 @@ def decode_png(png_bytes):
     return parse_payload(out)
 
 
-def case(name, payload, transform, ecl="M"):
+def decode_via_png(img):
+    """PIL image -> grayscale -> PNG -> CLI (format-agnostic path)."""
+    shot, _ = fit_for_cli(img, "PNG")
+    return decode_raw(shot)
+
+
+def case(name, payload, transform, ecl="M", mode="png", quality=None):
     png = encode_png(payload, ecl)
     img = Image.open(io.BytesIO(png))
     base_size = img.size
     img = transform(img)
-    shot, fit_scale = fit_for_cli(img)
-    got = decode_png(shot)
+    got = None
+    extra = ""
+    if mode == "bmp_raw":
+        # Raw BMP bytes straight into the CLI (self-implemented decoder).
+        shot, fit_scale = fit_for_cli(img, "BMP")
+        got = decode_raw(shot)
+        extra = " bmp %d B" % len(shot) + (
+            ", fit x%.2f" % fit_scale if fit_scale < 1.0 else ""
+        )
+    elif mode.startswith("reopen_"):
+        fmt = mode.split("_", 1)[1].upper()
+        kwargs = {"quality": quality} if quality else {}
+        buf = io.BytesIO()
+        img.save(buf, fmt, **kwargs)
+        raw = buf.getvalue()
+        img = Image.open(io.BytesIO(raw)).convert("L")
+        got = decode_via_png(img)
+        extra = " %s %d B" % (fmt, len(raw))
+    else:
+        shot, fit_scale = fit_for_cli(img, "PNG")
+        got = decode_raw(shot)
+        extra = " png %d B" % len(shot) + (
+            ", fit x%.2f" % fit_scale if fit_scale < 1.0 else ""
+        )
     ok = got == payload
     print(
-        "  %-34s %s  (%dx%d -> %dx%d, png %d B%s)"
-        % (
-            name,
-            "OK" if ok else "FAIL",
-            base_size[0],
-            base_size[1],
-            img.size[0],
-            img.size[1],
-            len(shot),
-            "" if fit_scale >= 1.0 else ", fit x%.2f" % fit_scale,
-        )
+        "  %-40s %s (%dx%d%s)"
+        % (name, "OK" if ok else "FAIL", base_size[0], base_size[1], extra)
     )
     if not ok:
         print("      want: %r" % payload)
@@ -127,6 +143,11 @@ def to_gray(img):
 
 def to_gray_rgb(img):
     return img.convert("RGB")
+
+
+def to_mono(img):
+    # No dither: keep QR edges sharp (fax / scanned-document style).
+    return img.convert("L").convert("1", dither=Image.Dither.NONE)
 
 
 def resize(scale):
@@ -167,28 +188,43 @@ def compose(*fs):
 
 
 def main():
-    print("QRFlux image pipeline E2E (real PNG screenshots)")
+    print("QRFlux image pipeline E2E (multi-format screenshots)")
     print("  project: %s" % PROJ)
     cases = [
-        ("plain PNG (gray)", "Hello QRFlux", to_gray),
-        ("RGB screenshot", "Hello QRFlux", to_gray_rgb),
-        ("grayscale + noise 60", "screenshot-noise", add_noise(60)),
-        ("resize 0.7", "resized-shot", resize(0.7)),
-        ("resize 1.5", "upscaled-shot", resize(1.5)),
-        ("blur radius 1", "blurred-shot", blur(1)),
-        ("noise + resize", "combo-shot", compose(add_noise(40), resize(0.8))),
-        ("V3 60-byte payload", "A" * 60, to_gray, "L"),
-        ("V5 120-byte payload", "B" * 120, to_gray, "L"),
+        # --- PNG path (self-decoded PNG) ---
+        ("plain PNG (gray)", "Hello QRFlux", to_gray, "M", "png", None),
+        ("RGB screenshot", "Hello QRFlux", to_gray_rgb, "M", "png", None),
+        ("grayscale + noise 60", "screenshot-noise", add_noise(60), "M", "png", None),
+        ("resize 0.7", "resized-shot", resize(0.7), "M", "png", None),
+        ("resize 1.5", "upscaled-shot", resize(1.5), "M", "png", None),
+        ("blur radius 1", "blurred-shot", blur(1), "M", "png", None),
+        ("noise + resize", "combo-shot", compose(add_noise(40), resize(0.8)), "M", "png", None),
+        ("V3 60-byte payload", "A" * 60, to_gray, "L", "png", None),
+        ("V5 120-byte payload", "B" * 120, to_gray, "L", "png", None),
+        # --- BMP path (self-decoded BMP, raw bytes) ---
+        # Note: 24-bit color BMPs are 3 bytes/pixel, so a QR screenshot
+        # must be downscaled below the decodable resolution to fit the
+        # CLI argument budget (~30 KB). Color-pixel coverage lives in the
+        # "RGB screenshot" case instead. 1-bit and 8-bit palette BMPs are
+        # the real-world clipboard formats and pass.
+        ("BMP raw 1-bit mono (self-decoded)", "BMP mono fax", to_mono, "M", "bmp_raw", None),
+        ("BMP raw 8-bit palette (self-decoded)", "BMP palette", to_gray, "M", "bmp_raw", None),
+        # --- format-agnostic screenshots (PIL reopen -> PNG) ---
+        ("GIF screenshot", "gif-shot", to_gray, "M", "reopen_gif", None),
+        ("TIFF screenshot", "tiff-shot", to_gray, "M", "reopen_tiff", None),
+        ("JPEG quality 95", "jpeg-shot-95", to_gray, "M", "reopen_jpeg", 95),
+        ("JPEG quality 85", "jpeg-shot-85", to_gray, "M", "reopen_jpeg", 85),
+        ("WebP quality 90", "webp-shot-90", to_gray, "M", "reopen_webp", 90),
     ]
     passed = 0
     failed = 0
     for item in cases:
         name, payload, transform = item[0], item[1], item[2]
-        ecl = item[3] if len(item) > 3 else "M"
+        ecl, mode, quality = item[3], item[4], item[5]
         try:
-            ok = case(name, payload, transform, ecl)
+            ok = case(name, payload, transform, ecl, mode, quality)
         except Exception as e:
-            print("  %-34s ERROR %s" % (name, e))
+            print("  %-40s ERROR %s" % (name, e))
             ok = False
         if ok:
             passed += 1

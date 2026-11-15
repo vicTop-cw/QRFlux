@@ -32,7 +32,7 @@ pub fn qrflux_encode_qr(data : String, version : Int32, ecl : String) -> String 
 /// Decode a QR code from a base64-encoded PNG screenshot.
 #export_name("qrflux_decode_image_png")
 pub fn qrflux_decode_image_png(png_b64 : String) -> String {
-  @web.web_decode_image_png(png_b64)
+  @web.web_decode_image(png_b64)
 }
 
 ///|
