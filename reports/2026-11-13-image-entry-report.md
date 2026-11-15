@@ -95,6 +95,13 @@
 
 继续隔离后确认：跨包长字符串、包内纯算式、包内 Buffer 大量写入、包内 base64、PNG 灰度尺寸**全部正确**；错误只出现在 `@qr.decode_from_pixels` 一路。同代码在 `moon test --target js`（1323 全绿）与 native（CLI 实测正确）无误 → 判定为**构建上下文相关的产物差异（工具链层面）**，非应用层缺陷。已收敛：导出面保留但标注未投入使用，前端走 server API。
 
+## 2026-11-15 续：issue 提交 + wasm 路线收敛 + 主线同步
+
+- **moonbitlang/moon#2527** 已提交（复现脚本 `scripts/repro_wasm_export_issue.cjs` 入库并实测：native OK / js WRONG，exit=1）
+- wasm 三路线受阻结论归档：MVP（无稳定 ABI + 无指针 API）、wasm-gc（non-null externref 无法由 JS API 表达，4 组合实测）、js（静默错值，已提 issue）
+- 申报书同步：测试数 1323、新增 PNG 直读/透视校正/浏览器内引擎（如实标注）能力行、已知限制三条、读数日期与 commits 更新
+- 详见 memory/2026-11-15.md
+
 ## 来源
 
 - 任务包：FIST-TASK-TREE.md T0.5
