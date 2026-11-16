@@ -187,6 +187,36 @@ def compose(*fs):
     return f
 
 
+def case_multi_frame(name, payload, seg_size, noise_amp=50):
+    """Dynamic-stream-like E2E: split a large payload into frames, push
+    every frame through the image pipeline (QR -> noise -> caller-side
+    binarization -> decode), and reassemble.
+
+    Binarization is part of the model: a noisy LARGE lossless PNG is
+    incompressible, so fit_for_cli would shrink it below ~3.3 px/module
+    where sampling fails. Real scanning pipelines binarize before
+    decoding; doing it caller-side keeps the module density intact.
+
+    Frames here are payload segments rather than the dynamic encoder's
+    packed frames (a faithful packed-frame image E2E needs a CLI
+    `frame -> image` capability, tracked as a follow-up)."""
+    segs = [payload[i:i + seg_size] for i in range(0, len(payload), seg_size)]
+    ok_all = True
+    for i, seg in enumerate(segs):
+        png = encode_png(seg, "M")
+        img = Image.open(io.BytesIO(png))
+        img = add_noise(noise_amp, seed=100 + i)(img)
+        # Caller-side binarization (standard QR pre-processing step).
+        img = img.point(lambda v: 0 if v < 128 else 255).convert("1")
+        shot, _ = fit_for_cli(img, "PNG")
+        got = decode_raw(shot)
+        if got != seg:
+            ok_all = False
+            print("      frame %d mismatch: want %r got %r" % (i, seg[:24], got))
+    print("  %-40s %s (%d frames, noise %d)" % (name, "OK" if ok_all else "FAIL", len(segs), noise_amp))
+    return ok_all
+
+
 def main():
     print("QRFlux image pipeline E2E (multi-format screenshots)")
     print("  project: %s" % PROJ)
@@ -214,6 +244,9 @@ def main():
         ("TIFF screenshot", "tiff-shot", to_gray, "M", "reopen_tiff", None),
         ("JPEG quality 95", "jpeg-shot-95", to_gray, "M", "reopen_jpeg", 95),
         ("JPEG quality 85", "jpeg-shot-85", to_gray, "M", "reopen_jpeg", 85),
+        ("JPEG quality 80", "jpeg-shot-80", to_gray, "M", "reopen_jpeg", 80),
+        ("JPEG quality 75", "jpeg-shot-75", to_gray, "M", "reopen_jpeg", 75),
+        ("JPEG quality 70", "jpeg-shot-70", to_gray, "M", "reopen_jpeg", 70),
         ("WebP quality 90", "webp-shot-90", to_gray, "M", "reopen_webp", 90),
     ]
     passed = 0
@@ -230,6 +263,18 @@ def main():
             passed += 1
         else:
             failed += 1
+    # Dynamic-stream-like multi-frame image E2E
+    # Light noise here on purpose: heavy noise on a large lossless PNG makes
+    # it incompressible, forcing fit_for_cli to shrink below ~3.3 px/module
+    # where sampling fails. Heavy-noise robustness is covered by the single-
+    # frame cases; real transports compress lossily, which smooths noise.
+    if case_multi_frame(
+        "multi-frame image E2E", "C" * 1000, 100, noise_amp=30
+    ):
+        passed += 1
+    else:
+        failed += 1
+
     print("")
     print("Total: %d passed, %d failed" % (passed, failed))
     return 0 if failed == 0 else 1

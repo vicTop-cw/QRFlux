@@ -7,13 +7,38 @@
 /// be converted to one of these by the caller.
 
 ///|
+/// Hex digit to string. Uses a match over integer literals instead of
+/// indexing a digit string: on the js backend `s[i]` yields a UTF-16
+/// code unit (Int), whose `.to_string()` formats the numeric value
+/// ("f" -> "102"), silently corrupting hex output.
+fn web_hex_digit(v : Int32) -> String {
+  match v {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    9 => "9"
+    10 => "a"
+    11 => "b"
+    12 => "c"
+    13 => "d"
+    14 => "e"
+    _ => "f"
+  }
+}
+
+///|
 /// Encode bytes as lowercase hex.
 fn web_bytes_to_hex(data : FixedArray[Int32]) -> String {
-  let digits = "0123456789abcdef"
   let mut sb = ""
   for i = 0; i < data.length(); i = i + 1 {
     let b = data[i] & 0xFF
-    sb = sb + digits[b / 16].to_string() + digits[b % 16].to_string()
+    sb = sb + web_hex_digit(b / 16) + web_hex_digit(b % 16)
   }
   sb
 }

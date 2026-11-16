@@ -3,6 +3,7 @@
 > 纯 MoonBit 二维码无损文件传输——把二维码从「扫码跳转」升级为「无网环境下的文件传输媒介」。
 
 [![Made with MoonBit](https://img.shields.io/badge/MoonBit-0.1.20261104-blue)](https://www.moonbitlang.com)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/License-Apache--2.0-green)](./LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1287%2F1287-brightgreen)](./src)
 [![Cross-validation](https://img.shields.io/badge/zxing--cpp-165%2F165-brightgreen)](./scripts)

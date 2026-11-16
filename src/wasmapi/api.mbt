@@ -4,22 +4,20 @@
 /// Build: moon build --target js --release
 ///        moon build --target wasm-gc --release
 ///
-/// STATUS (2026-11-13): the three symbols below are present in both the
-/// wasm-gc and js artifacts (verified via `WebAssembly.Module.exports`
-/// and ESM `export {...}`) and are callable from Node.
+/// STATUS (2026-11-15): ENABLED. Root cause of the earlier wrong
+/// payloads was found with help from moonbitlang/moon#2527: it was an
+/// application bug, not a toolchain issue — `digits[i].to_string()` on
+/// the js backend formats the UTF-16 code unit ("f" -> "102") because
+/// `String[i]` yields a code-unit Int there. Fixed by replacing the
+/// indexed lookup with an integer match (`web_hex_digit`).
+/// After the fix the js artifact decodes PNG and BMP screenshots
+/// end-to-end with correct payloads and is wired into web/camera.html
+/// as the primary in-browser decoder (imported from /wasmapi.js,
+/// served by web/server.js from this build output).
 ///
-/// They are NOT wired into the web frontend. Reason: decoding a real
-/// screenshot through this foreign_library build returns wrong payload
-/// bytes on the js backend, while the identical logic is correct under
-/// `moon test --target js` and on native. Isolation so far:
-///   - base64 decoding inside this package: byte-exact (PNG signature OK)
-///   - grayscale dimensions after PNG decode: correct
-///   - final payload: wrong (e.g. "RVTw..." instead of "Hi")
-/// Non-strings, Buffer writes, bit arithmetic, string traversal and
-/// cross-package calls were each verified correct in isolation.
-/// Conclusion: a build-context difference in the artifact (toolchain
-/// level); see memory/2026-11-13.md for the full elimination table.
-/// The frontend therefore keeps using the local server API path.
+/// wasm-gc note: the artifact's 75 string-constant globals are non-null
+/// `(ref extern)`, which the current JS API cannot express; the js
+/// backend artifact is the wired one.
 
 ///|
 /// Encode a QR code; returns a JSON envelope with the module matrix.

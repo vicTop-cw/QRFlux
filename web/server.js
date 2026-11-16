@@ -68,6 +68,19 @@ const server = http.createServer((req, res) => {
     }
     return;
   }
+  // MoonBit js artifact for the in-browser engine (built with
+  // `moon build --target js`); 404 tells the page to fall back.
+  if (req.url === '/wasmapi.js') {
+    try {
+      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+      res.end(fs.readFileSync(
+        path.join(ROOT, '_build/js/release/build/src/wasmapi/wasmapi.js'), 'utf8'));
+    } catch (e) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('// artifact not built; run: moon build --target js');
+    }
+    return;
+  }
   if (req.url === '/camera' || req.url === '/camera.html') {
     try {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

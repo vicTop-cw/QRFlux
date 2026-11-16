@@ -5,12 +5,10 @@
 // Build: moon build --target js --release
 //        moon build --target wasm-gc --release
 //
-// STATUS (2026-11-13): exports verified present in both artifacts.
-// NOT IN USE: the same decode logic is correct under `moon test` and on
-// native, but the artifact built from this package returns wrong bytes
-// for real PNG decodes on the js backend (verified: base64 in-package is
-// byte-exact, grayscale dimensions correct, final payload wrong). See
-// src/wasmapi/api.mbt header and memory/2026-11-13.md.
+// STATUS (2026-11-15): exports verified present in both artifacts and
+// the js artifact is wired into web/camera.html as the primary in-browser
+// decoder (see src/wasmapi/api.mbt header for the hex-formatting bug
+// that previously blocked this, fixed via moon#2527).
 import {
   "vicTop-cw/QRFlux/src/web",
 }

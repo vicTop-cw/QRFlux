@@ -82,7 +82,7 @@
 
   <!-- jsQR library for QR decoding -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.2/dist/jsQR.js"></script>
-  <script>
+  <script type="module">
     let videoStream = null;
     let scanning = false;
 
@@ -126,6 +126,33 @@
       return c;
     }
 
+    // Browser-resident engine: MoonBit compiled to JS, imported once.
+    let browserEngine = null;
+    try {
+      browserEngine = await import('/wasmapi.js');
+    } catch (e) {
+      browserEngine = null;
+    }
+
+    async function decodeInBrowser(canvas) {
+      if (!browserEngine) return false;
+      try {
+        const small = downscaleCanvas(canvas, 480);
+        const b64 = small.toDataURL('image/png').replace(/^data:image\/\w+;base64,/, '');
+        const res = String(browserEngine.qrflux_decode_image_png(b64));
+        const j = JSON.parse(res);
+        if (!j.ok) return false;
+        const bytes = j.hex.match(/../g).map(h => parseInt(h, 16));
+        const text = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes));
+        showResult('\u2705 QRFlux \u6d4f\u89c8\u5668\u5185\u5f15\u64ce\u89e3\u7801\u6210\u529f\uff01<br><br><strong>\u6570\u636e:</strong> ' +
+          text.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])), '');
+        setStatus('\u2705 \u6d4f\u89c8\u5668\u5185\u5f15\u64ce\u89e3\u7801\u6210\u529f');
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
     // Primary path: self-implemented decoder via the local server CLI.
     async function decodeViaEngine(canvas) {
       try {
@@ -163,8 +190,11 @@
       img.src = canvas.toDataURL('image/png');
       img.style.display = 'block';
 
-      // Primary: self-implemented decoder (Otsu + finder + resample), no
-      // external library in the loop.
+      // Primary 1: in-browser engine (MoonBit compiled to JS) — zero
+      // network round-trip, no external library in the loop.
+      if (await decodeInBrowser(canvas)) return;
+
+      // Primary 2: self-implemented decoder via the local server CLI.
       if (await decodeViaEngine(canvas)) return;
 
       // Fallback: in-browser jsQR if the local engine is unavailable.
