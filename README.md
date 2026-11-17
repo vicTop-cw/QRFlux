@@ -23,6 +23,7 @@
 | QR 编码器（V1~V40 全版本，L/M/Q/H 四档纠错） | ✅ |
 | 自研 QR 解码器（V1~V40 全版本全模式，矩阵入口） | ✅ |
 | **图像入口解码（截图/像素 → 矩阵，自研全链路）** | ✅ |
+| **自适应阈值（分块 Otsu，亮度不均/侧光）** | ✅ |
 | **透视校正（斜拍，homography + alignment pattern）** | ✅ V2+ |
 | **PNG 文件解码（灰度/RGB/RGBA，自研 chunk + 反 filter）** | ✅ |
 | **BMP 文件解码（24/32bpp + 8/1bit 调色板，自研）** | ✅ |
@@ -63,7 +64,7 @@ moon run cmd/main -- --decode-image-b64 $b64
 真实截图端到端验证（PIL 模拟灰度 / 缩放 / 模糊 / 噪声 / RGB / V3 / V5）：
 
 ```sh
-python scripts/verify_image_pipeline.py    # 16/16 OK（PNG/BMP/GIF/TIFF/JPEG/WebP 多格式 + 扰动矩阵）
+python scripts/verify_image_pipeline.py    # 21/21 OK（PNG/BMP/GIF/TIFF/JPEG/WebP 多格式 + 扰动矩阵）
 ```
 
 **前端解码**：`web/camera.html` 主路径走本地 `/api/decode-image`（server.js 用 `spawnSync`
@@ -83,11 +84,11 @@ fallback；外部图像库不再在主路径上。
 |---|---|---|
 | moon fmt --check | 通过 | `moon fmt --check` |
 | moon check | 0 errors, 0 warnings | `moon check` |
-| moon test --target js | **1332/1332** | `moon test --target js` |
+| moon test --target js | **1338/1338** | `moon test --target js` |
 | 交叉验证（zxing-cpp，V1~V40 全版本全纠错级全模式） | **165/165 OK** | `moon run cmd/main > batch.txt && python scripts/verify_qr.py batch.txt` |
 | WASM（release） | 56968 字节（≈56KB） | `moon build --target wasm --release` |
 
-### 测试覆盖分类（1332 个测试）
+### 测试覆盖分类（1338 个测试）
 
 | 类别 | 数量 | 覆盖内容 |
 |------|------|----------|

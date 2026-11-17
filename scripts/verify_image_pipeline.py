@@ -172,6 +172,24 @@ def add_noise(amp, seed=7):
     return f
 
 
+def gradient_light(dark=64, bright=255):
+    """Multiplicative side-light: left edge dark, right edge full — the
+    classic uneven-illumination photo that defeats a single global
+    threshold."""
+    def f(img):
+        g = img.convert("L")
+        w, h = g.size
+        px = g.load()
+        for x in range(w):
+            t = x / max(1, w - 1)
+            level = int(dark + (bright - dark) * t)
+            for y in range(h):
+                v = px[x, y] * level // 255
+                px[x, y] = max(0, min(255, v))
+        return g
+    return f
+
+
 def blur(radius):
     def f(img):
         return img.convert("L").filter(ImageFilter.GaussianBlur(radius))
@@ -248,6 +266,7 @@ def main():
         ("JPEG quality 75", "jpeg-shot-75", to_gray, "M", "reopen_jpeg", 75),
         ("JPEG quality 70", "jpeg-shot-70", to_gray, "M", "reopen_jpeg", 70),
         ("WebP quality 90", "webp-shot-90", to_gray, "M", "reopen_webp", 90),
+        ("gradient illumination 25%-100%", "grad-light", gradient_light(64, 255), "M", "png", None),
     ]
     passed = 0
     failed = 0

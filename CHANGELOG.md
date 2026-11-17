@@ -8,8 +8,9 @@
 - PNG 文件直读：自研 chunk 解析 + 反 filter（5 种）+ 位深/色彩展开（灰度 1/2/4/8bit、RGB、灰度+Alpha、RGBA）
 - BMP 文件直读：24/32bpp BGR(A) + 8/1bit 调色板，bottom-up/top-down
 - 统一图像入口 `decode_image_gray`：PNG/BMP 魔数自动分流，web 与 CLI 共用
+- 自适应阈值：tile×tile 分块 Otsu（全局失败后自适应重试），亮度不均/侧光场景可解；渐变光照 25%-100% E2E 用例
 - CLI `--decode-image-b64`：格式自动探测的截图解码（含命令行长度预算检查）
-- 多格式截图 E2E（`scripts/verify_image_pipeline.py`）：PNG/BMP raw/GIF/TIFF/JPEG q70-95/WebP，16/16
+- 多格式截图 E2E（`scripts/verify_image_pipeline.py`）：PNG/BMP raw/GIF/TIFF/JPEG q70-95/WebP + 渐变光照 + 多帧序列，21/21
 - **浏览器内引擎启用**：MoonBit js 产物（`/wasmapi.js`）作为 camera.html 主解码路径，server API 与 jsQR 降级
 - WASM/JS 导出面（`src/wasmapi`，foreign_library + `#export_name`）：js 产物 ESM 接线；wasm-gc 符号亦验证（host 侧 non-null externref 仍受 JS API 限制）
 - 复现脚本 `scripts/repro_wasm_export_issue.cjs`（修复后 not reproduced，留作回归）
