@@ -24,6 +24,7 @@
 | 自研 QR 解码器（V1~V40 全版本全模式，矩阵入口） | ✅ |
 | **图像入口解码（截图/像素 → 矩阵，自研全链路）** | ✅ |
 | **自适应阈值（分块 Otsu，亮度不均/侧光）** | ✅ |
+| **动态码流忠实图像 E2E（帧 PNG → 解码 → 重组）** | ✅ |
 | **透视校正（斜拍，homography + alignment pattern）** | ✅ V2+ |
 | **PNG 文件解码（灰度/RGB/RGBA，自研 chunk + 反 filter）** | ✅ |
 | **BMP 文件解码（24/32bpp + 8/1bit 调色板，自研）** | ✅ |
@@ -64,7 +65,7 @@ moon run cmd/main -- --decode-image-b64 $b64
 真实截图端到端验证（PIL 模拟灰度 / 缩放 / 模糊 / 噪声 / RGB / V3 / V5）：
 
 ```sh
-python scripts/verify_image_pipeline.py    # 21/21 OK（PNG/BMP/GIF/TIFF/JPEG/WebP 多格式 + 扰动矩阵）
+python scripts/verify_image_pipeline.py    # 22/22 OK（含动态码流忠实图像 E2E）（PNG/BMP/GIF/TIFF/JPEG/WebP 多格式 + 扰动矩阵）
 ```
 
 **前端解码**：`web/camera.html` 主路径走本地 `/api/decode-image`（server.js 用 `spawnSync`

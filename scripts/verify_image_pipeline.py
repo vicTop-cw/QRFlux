@@ -2,15 +2,21 @@
 """End-to-end check: real screenshots in many formats -> self-implemented
 pixel decoder.
 
-Two paths are exercised:
+Paths exercised:
 
-1. **Self-decoded raw formats** — the CLI sniffs the magic bytes and runs
-   the self-implemented decoder (currently PNG and BMP). BMP cases feed
-   the raw BMP bytes directly (Windows clipboard scenario).
+1. **Self-decoded raw formats** — the CLI sniffs magic bytes and runs the
+   self-implemented decoder (PNG, BMP). BMP cases feed raw BMP bytes
+   directly (Windows clipboard scenario).
 2. **Format-agnostic screenshots** — PIL writes the QR image as
    GIF/TIFF/JPEG/WebP, reads it back, converts to grayscale PNG and feeds
    the decoder. This models "the remote machine sent whatever format it
    had": as long as the pixels survive, the transmission is lossless.
+3. **Uneven illumination** — multiplicative side-light gradient; global
+   Otsu fails, the adaptive tile-wise retry recovers.
+4. **Dynamic stream (faithful)** — dynamic encode -> per-frame PNG ->
+   perturbation -> image decode -> reassemble -> original payload.
+
+All comparisons are byte-exact via the CLI's IMAGE_HEX output line.
 
 Usage:
   python scripts/verify_image_pipeline.py
@@ -40,29 +46,41 @@ def moon(args, timeout=180):
     )
 
 
-def parse_payload(stdout):
-    for line in stdout.splitlines():
-        s = line.strip()
-        if s and not s.startswith("#"):
-            return s
-    return None
+def first_data(stdout):
+    ls = [
+        l.strip()
+        for l in stdout.splitlines()
+        if l.strip() and not l.startswith("#")
+    ]
+    return ls[0] if ls else None
 
 
 def encode_png(payload, ecl="M"):
     rc, out, err = moon(["--text", payload, "--format", "png", "--ecl", ecl])
-    b64 = parse_payload(out)
+    b64 = first_data(out)
     if not b64:
         raise RuntimeError("encode failed: " + (err or out))
     return base64.b64decode(b64)
 
 
-def fit_for_cli(img, fmt="PNG", quality=None):
-    """Encode to `fmt`, downscaling until the base64 fits the CLI budget.
+def decode_exact(data):
+    """Feed raw image bytes to the CLI; return the payload as exact hex
+    from the IMAGE_HEX line (byte-exact, display-path-proof), or None."""
+    b64 = base64.b64encode(data).decode("ascii")
+    if len(b64) > MAX_B64:
+        return None
+    rc, out, err = moon(["--decode-image-b64", b64])
+    for l in out.splitlines():
+        if l.startswith("IMAGE_HEX "):
+            return l[len("IMAGE_HEX "):].strip()
+        if l.strip().startswith("Error"):
+            return None
+    return None
 
-    Windows CreateProcess caps the whole command line at ~32 KB, so an
-    over-large image is downscaled the way a user would crop/zoom before
-    handing it to the decoder.
-    """
+
+def fit_for_cli(img, fmt="PNG", quality=None):
+    """Encode to `fmt`, downscaling until the base64 fits the CLI budget
+    (~32 KB CreateProcess cap)."""
     scale = 1.0
     data = b""
     for _ in range(10):
@@ -80,61 +98,7 @@ def fit_for_cli(img, fmt="PNG", quality=None):
     return data, scale
 
 
-def decode_raw(data):
-    """Feed raw image bytes (any sniffer-supported format) to the CLI."""
-    b64 = base64.b64encode(data).decode("ascii")
-    if len(b64) > MAX_B64:
-        return None
-    rc, out, err = moon(["--decode-image-b64", b64])
-    if out.strip().startswith("Error"):
-        return None
-    return parse_payload(out)
-
-
-def decode_via_png(img):
-    """PIL image -> grayscale -> PNG -> CLI (format-agnostic path)."""
-    shot, _ = fit_for_cli(img, "PNG")
-    return decode_raw(shot)
-
-
-def case(name, payload, transform, ecl="M", mode="png", quality=None):
-    png = encode_png(payload, ecl)
-    img = Image.open(io.BytesIO(png))
-    base_size = img.size
-    img = transform(img)
-    got = None
-    extra = ""
-    if mode == "bmp_raw":
-        # Raw BMP bytes straight into the CLI (self-implemented decoder).
-        shot, fit_scale = fit_for_cli(img, "BMP")
-        got = decode_raw(shot)
-        extra = " bmp %d B" % len(shot) + (
-            ", fit x%.2f" % fit_scale if fit_scale < 1.0 else ""
-        )
-    elif mode.startswith("reopen_"):
-        fmt = mode.split("_", 1)[1].upper()
-        kwargs = {"quality": quality} if quality else {}
-        buf = io.BytesIO()
-        img.save(buf, fmt, **kwargs)
-        raw = buf.getvalue()
-        img = Image.open(io.BytesIO(raw)).convert("L")
-        got = decode_via_png(img)
-        extra = " %s %d B" % (fmt, len(raw))
-    else:
-        shot, fit_scale = fit_for_cli(img, "PNG")
-        got = decode_raw(shot)
-        extra = " png %d B" % len(shot) + (
-            ", fit x%.2f" % fit_scale if fit_scale < 1.0 else ""
-        )
-    ok = got == payload
-    print(
-        "  %-40s %s (%dx%d%s)"
-        % (name, "OK" if ok else "FAIL", base_size[0], base_size[1], extra)
-    )
-    if not ok:
-        print("      want: %r" % payload)
-        print("      got : %r" % got)
-    return ok
+# ---------------- transforms ----------------
 
 
 def to_gray(img):
@@ -172,6 +136,12 @@ def add_noise(amp, seed=7):
     return f
 
 
+def blur(radius):
+    def f(img):
+        return img.convert("L").filter(ImageFilter.GaussianBlur(radius))
+    return f
+
+
 def gradient_light(dark=64, bright=255):
     """Multiplicative side-light: left edge dark, right edge full — the
     classic uneven-illumination photo that defeats a single global
@@ -190,12 +160,6 @@ def gradient_light(dark=64, bright=255):
     return f
 
 
-def blur(radius):
-    def f(img):
-        return img.convert("L").filter(ImageFilter.GaussianBlur(radius))
-    return f
-
-
 def compose(*fs):
     def f(img):
         out = img
@@ -205,34 +169,145 @@ def compose(*fs):
     return f
 
 
-def case_multi_frame(name, payload, seg_size, noise_amp=50):
-    """Dynamic-stream-like E2E: split a large payload into frames, push
-    every frame through the image pipeline (QR -> noise -> caller-side
-    binarization -> decode), and reassemble.
+# ---------------- cases ----------------
+
+
+def case(name, payload, transform, ecl="M", mode="png", quality=None):
+    png = encode_png(payload, ecl)
+    img = Image.open(io.BytesIO(png))
+    base_size = img.size
+    img = transform(img)
+    extra = ""
+    if mode == "bmp_raw":
+        shot, fit_scale = fit_for_cli(img, "BMP")
+        got_hex = decode_exact(shot)
+        extra = " bmp %d B" % len(shot) + (
+            ", fit x%.2f" % fit_scale if fit_scale < 1.0 else ""
+        )
+    else:
+        shot, fit_scale = fit_for_cli(img, "PNG")
+        got_hex = decode_exact(shot)
+        extra = " png %d B" % len(shot) + (
+            ", fit x%.2f" % fit_scale if fit_scale < 1.0 else ""
+        )
+    want_hex = payload.encode("utf-8").hex()
+    ok = got_hex == want_hex
+    print(
+        "  %-40s %s (%dx%d%s)"
+        % (name, "OK" if ok else "FAIL", base_size[0], base_size[1], extra)
+    )
+    if not ok:
+        print("      want hex: %s" % want_hex)
+        print("      got  hex: %s" % (got_hex if got_hex else "None"))
+    return ok
+
+
+def case_multi_frame(name, payload, seg_size, noise_amp=30):
+    """Dynamic-stream-like multi-frame image E2E: split a large payload
+    into segments, push every segment through the image pipeline (QR ->
+    noise -> caller-side binarization -> decode), and reassemble.
 
     Binarization is part of the model: a noisy LARGE lossless PNG is
     incompressible, so fit_for_cli would shrink it below ~3.3 px/module
     where sampling fails. Real scanning pipelines binarize before
-    decoding; doing it caller-side keeps the module density intact.
-
-    Frames here are payload segments rather than the dynamic encoder's
-    packed frames (a faithful packed-frame image E2E needs a CLI
-    `frame -> image` capability, tracked as a follow-up)."""
+    decoding; doing it caller-side keeps module density intact."""
     segs = [payload[i:i + seg_size] for i in range(0, len(payload), seg_size)]
     ok_all = True
     for i, seg in enumerate(segs):
         png = encode_png(seg, "M")
         img = Image.open(io.BytesIO(png))
         img = add_noise(noise_amp, seed=100 + i)(img)
-        # Caller-side binarization (standard QR pre-processing step).
         img = img.point(lambda v: 0 if v < 128 else 255).convert("1")
         shot, _ = fit_for_cli(img, "PNG")
-        got = decode_raw(shot)
-        if got != seg:
+        got_hex = decode_exact(shot)
+        if got_hex != seg.encode("utf-8").hex():
             ok_all = False
-            print("      frame %d mismatch: want %r got %r" % (i, seg[:24], got))
-    print("  %-40s %s (%d frames, noise %d)" % (name, "OK" if ok_all else "FAIL", len(segs), noise_amp))
+            print(
+                "      frame %d mismatch: want %s got %s"
+                % (i, seg.encode("utf-8").hex()[:32], got_hex)
+            )
+    print(
+        "  %-40s %s (%d frames, noise %d)"
+        % (name, "OK" if ok_all else "FAIL", len(segs), noise_amp)
+    )
     return ok_all
+
+
+def case_dynamic_faithful(name, payload, frame_size, noise_amp=30):
+    """Faithful dynamic-stream image E2E: dynamic encode -> per-frame PNG
+    -> perturbation -> image decode (IMAGE_HEX) -> reassemble via
+    --decode-dynamic -> original payload. This pins the seam between the
+    dynamic stream module and the image entry module with the real
+    encoders/decoders on both ends."""
+    rc, out, err = moon([
+        "--text", payload, "--encode-dynamic",
+        "--frame-size", str(frame_size), "--format", "png",
+    ])
+    frames = []
+    want_hexes = []
+    for line in out.splitlines():
+        l = line.strip()
+        if not l:
+            continue
+        if l.startswith("FRAME_HEX "):
+            want_hexes.append(l[len("FRAME_HEX "):].strip())
+            continue
+        if l.startswith("#"):
+            if l.startswith("# frame"):
+                frames.append([])
+            continue
+        if frames and frames[-1] == []:
+            frames[-1].append(l)
+    if not frames:
+        print("  %-40s ERROR no frames parsed" % name)
+        return False
+    frame_hexes = []
+    all_ok = True
+    for i, png_lines in enumerate(frames):
+        shot0 = base64.b64decode(png_lines[0])
+        img = Image.open(io.BytesIO(shot0)).convert("L")
+        img = add_noise(noise_amp, seed=300 + i)(img)
+        # Caller-side binarization: noisy lossless frames are
+        # incompressible and would trip the CLI argument budget.
+        img = img.point(lambda v: 0 if v < 128 else 255).convert("1")
+        shot, _ = fit_for_cli(img, "PNG")
+        hex_line = decode_exact(shot)
+        want = want_hexes[i] if i < len(want_hexes) else "?"
+        if hex_line is None:
+            all_ok = False
+            print("      frame %d: image decode failed" % i)
+            continue
+        if hex_line != want:
+            all_ok = False
+            print(
+                "      frame %d MISMATCH: want %s got %s"
+                % (i, want[:32], hex_line[:32])
+            )
+        frame_hexes.append(hex_line)
+    # Reassemble via --decode-dynamic and compare against the payload.
+    joined = ";".join(frame_hexes)
+    ok = False
+    if len(joined) > MAX_B64:
+        print("  %-40s ERROR reassembly hex %d > budget" % (name, len(joined)))
+    else:
+        rc3, out3, _ = moon(["--decode-dynamic", "--hex", joined])
+        decoded_hex = None
+        decoded_text = None
+        for l in out3.splitlines():
+            if l.startswith("REASSEMBLED_HEX "):
+                decoded_hex = l[len("REASSEMBLED_HEX "):].strip()
+                break
+        if decoded_hex:
+            decoded_text = bytes.fromhex(decoded_hex).decode("utf-8", "replace")
+            ok = decoded_hex == payload.encode("utf-8").hex()
+    print(
+        "  %-40s %s (%d frames, noise %d, faithful dynamic)"
+        % (name, "OK" if ok else "FAIL", len(frames), noise_amp)
+    )
+    if not ok:
+        print("      want: %r" % payload[:60])
+        print("      got : %r" % (decoded_text or "")[:60])
+    return ok
 
 
 def main():
@@ -266,6 +341,7 @@ def main():
         ("JPEG quality 75", "jpeg-shot-75", to_gray, "M", "reopen_jpeg", 75),
         ("JPEG quality 70", "jpeg-shot-70", to_gray, "M", "reopen_jpeg", 70),
         ("WebP quality 90", "webp-shot-90", to_gray, "M", "reopen_webp", 90),
+        # --- uneven illumination (adaptive binarize) ---
         ("gradient illumination 25%-100%", "grad-light", gradient_light(64, 255), "M", "png", None),
     ]
     passed = 0
@@ -282,13 +358,19 @@ def main():
             passed += 1
         else:
             failed += 1
-    # Dynamic-stream-like multi-frame image E2E
-    # Light noise here on purpose: heavy noise on a large lossless PNG makes
-    # it incompressible, forcing fit_for_cli to shrink below ~3.3 px/module
-    # where sampling fails. Heavy-noise robustness is covered by the single-
-    # frame cases; real transports compress lossily, which smooths noise.
-    if case_multi_frame(
-        "multi-frame image E2E", "C" * 1000, 100, noise_amp=30
+
+    # Dynamic-stream-like multi-frame image E2E. Light noise on purpose:
+    # heavy noise on a large lossless PNG makes it incompressible, forcing
+    # fit_for_cli to shrink below ~3.3 px/module where sampling fails.
+    # Heavy-noise robustness is covered by the single-frame cases.
+    if case_multi_frame("multi-frame image E2E", "C" * 1000, 100, noise_amp=30):
+        passed += 1
+    else:
+        failed += 1
+
+    # Faithful dynamic-stream image E2E (packed frames -> PNG -> decode)
+    if case_dynamic_faithful(
+        "dynamic stream faithful image E2E", "D" * 300, 50, noise_amp=30
     ):
         passed += 1
     else:

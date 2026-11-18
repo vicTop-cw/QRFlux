@@ -114,3 +114,10 @@
 
 - 任务包：FIST-TASK-TREE.md T0.5
 - 产出物：`src/qr/image_decode.mbt` 等三文件 + README/TASK-TREE 同步
+
+
+## 2026-11-15 续 3：动态码流忠实图像 E2E
+
+- CLI 三条精确比对行：FRAME_HEX（动态帧字节）/ IMAGE_HEX（图像解码 payload）/ REASSEMBLED_HEX（重组 payload）
+- 忠实闭环实测：动态编码 → 6 帧 PNG → 噪声+二值化 → 图像解码 → 重组 → 原始 payload，全链路通过
+- E2E 总数 22/22（含渐变光照、JPEG q70-95、BMP raw、多帧序列）

@@ -377,6 +377,13 @@ fn run_decode_image(b64 : String) -> Unit {
   match @qr.decode_from_pixels(gray) {
     Some(data) => {
       println("# decoded from image: " + data.length().to_string() + " bytes")
+      // Exact hex line: image payloads may be binary (dynamic-stream
+      // frames have a binary header), which the display path escapes.
+      let mut hx = ""
+      for i = 0; i < data.length(); i = i + 1 {
+        hx = hx + hex2(data[i])
+      }
+      println("IMAGE_HEX " + hx)
       println(bytes_to_display(data))
     }
     None => println("Error: no decodable QR code found in image")
@@ -448,6 +455,13 @@ fn run_decode_dynamic(hex : String) -> Unit {
         frames.length().to_string() +
         " frames",
       )
+      // Exact hex line: reassembled payloads may be binary, which the
+      // display path escapes.
+      let mut hx = ""
+      for i = 0; i < data.length(); i = i + 1 {
+        hx = hx + hex2(data[i])
+      }
+      println("REASSEMBLED_HEX " + hx)
       println(bytes_to_display(data))
     }
   }
@@ -608,6 +622,31 @@ fn run_dynamic(
       }
     }
     println(hex)
+    return
+  }
+  if format == "png" {
+    // Output each frame as a PNG image (base64), one line per frame with
+    // a comment header: a faithful dynamic-stream screenshot series for
+    // the image-entry E2E (decode each PNG, re-hex, reassemble).
+    // FRAME_HEX carries the exact packed-frame bytes for per-frame
+    // comparison on the test side.
+    for i = 0; i < total; i = i + 1 {
+      let qr = @qr.encode_binary(frames[i], ecl_from_name(ecl), 1)
+      println(
+        "# frame " +
+        i.to_string() +
+        "/" +
+        total.to_string() +
+        " frame_len=" +
+        frames[i].length().to_string(),
+      )
+      let mut fh = "FRAME_HEX "
+      for j = 0; j < frames[i].length(); j = j + 1 {
+        fh = fh + hex2(frames[i][j])
+      }
+      println(fh)
+      println(base64_encode(@qr.to_png(qr, 10, 4)))
+    }
     return
   }
   for i = 0; i < total; i = i + 1 {
